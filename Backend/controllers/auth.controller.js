@@ -26,16 +26,7 @@ export const vendorLogin = async (req, res, next) => {
     if (!vendor) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
-      });
-    }
-
-    // Check if vendor is approved
-    if (vendor.status !== 'approved') {
-      return res.status(403).json({
-        success: false,
-        message: 'Account pending admin approval',
-        data: { status: vendor.status }
+        message: 'Invalid email or password'
       });
     }
 
@@ -45,7 +36,20 @@ export const vendorLogin = async (req, res, next) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
+      });
+    }
+
+    // Check if vendor is approved
+    if (vendor.status !== 'approved') {
+      return res.status(403).json({
+        success: false,
+        message: 'Account pending admin approval',
+        data: { 
+          status: vendor.status,
+          id: vendor._id,
+          email: vendor.email
+        }
       });
     }
 
@@ -68,11 +72,14 @@ export const vendorLogin = async (req, res, next) => {
         email: vendor.email,
         role: 'vendor',
         status: vendor.status,
-        profileCompleted: vendor.profileCompleted
+        profileCompleted: vendor.profileCompleted,
+        pharmacyInfo: vendor.pharmacyInfo,
+        pharmacyOwner: vendor.pharmacyOwner
       }
     });
 
   } catch (error) {
+    console.error('Vendor login error:', error);
     next(error);
   }
 };
@@ -97,7 +104,7 @@ export const adminLogin = async (req, res, next) => {
     if (!admin) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
       });
     }
 
@@ -107,7 +114,7 @@ export const adminLogin = async (req, res, next) => {
     if (!isPasswordValid) {
       return res.status(401).json({
         success: false,
-        message: 'Invalid credentials'
+        message: 'Invalid email or password'
       });
     }
 
@@ -136,6 +143,79 @@ export const adminLogin = async (req, res, next) => {
     });
 
   } catch (error) {
+    console.error('Admin login error:', error);
+    next(error);
+  }
+};
+
+// @desc    Get current user
+// @route   GET /api/auth/me
+// @access  Private
+export const getCurrentUser = async (req, res, next) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({
+        success: false,
+        message: 'Not authenticated'
+      });
+    }
+
+    let userData;
+    
+    if (req.user.role === 'vendor') {
+      // Populate vendor data
+      const vendor = await Vendor.findById(req.user._id)
+        .select('-password')
+        .populate('approvedBy', 'firstName lastName email');
+      
+      if (!vendor) {
+        return res.status(404).json({
+          success: false,
+          message: 'Vendor not found'
+        });
+      }
+
+      userData = {
+        id: vendor._id,
+        email: vendor.email,
+        role: 'vendor',
+        status: vendor.status,
+        profileCompleted: vendor.profileCompleted || false,
+        registeredAt: vendor.registeredAt,
+        lastLoginAt: vendor.lastLoginAt,
+        // Vendor specific data
+        pharmacyInfo: vendor.pharmacyInfo,
+        pharmacyOwner: vendor.pharmacyOwner,
+        primaryContact: vendor.primaryContact,
+        pharmacyLicense: vendor.pharmacyLicense,
+        pharmacyQuestions: vendor.pharmacyQuestions,
+        referralInfo: vendor.referralInfo,
+        documents: vendor.documents,
+        approvedBy: vendor.approvedBy,
+        approvedAt: vendor.approvedAt,
+        rejectionReason: vendor.rejectionReason
+      };
+    } else {
+      // Admin data
+      userData = {
+        id: req.user._id,
+        email: req.user.email,
+        role: req.user.role,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+        isActive: req.user.isActive,
+        permissions: req.user.permissions,
+        lastLoginAt: req.user.lastLoginAt
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      data: userData
+    });
+
+  } catch (error) {
+    console.error('Get current user error:', error);
     next(error);
   }
 };
@@ -152,6 +232,7 @@ export const logout = async (req, res, next) => {
       message: 'Logged out successfully'
     });
   } catch (error) {
+    console.error('Logout error:', error);
     next(error);
   }
 };
@@ -215,6 +296,7 @@ export const forgotPassword = async (req, res, next) => {
     });
 
   } catch (error) {
+    console.error('Forgot password error:', error);
     next(error);
   }
 };
@@ -289,42 +371,7 @@ export const resetPassword = async (req, res, next) => {
     });
 
   } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-export const getCurrentUser = async (req, res, next) => {
-  try {
-    let user;
-    
-    if (req.user.role === 'vendor') {
-      user = await Vendor.findById(req.user.id)
-        .select('-password')
-        .populate('approvedBy', 'firstName lastName');
-    } else {
-      user = await Admin.findById(req.user.id)
-        .select('-password');
-    }
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'User not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: {
-        ...user.toObject(),
-        role: req.user.role
-      }
-    });
-
-  } catch (error) {
+    console.error('Reset password error:', error);
     next(error);
   }
 };

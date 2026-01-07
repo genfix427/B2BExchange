@@ -14,7 +14,7 @@ export const api = {
     
     const config = {
       ...options,
-      credentials: 'include', // Include cookies
+      credentials: 'include', // CRITICAL: Include cookies
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
@@ -82,10 +82,7 @@ export const api = {
       method: 'POST',
       body: formData,
       credentials: 'include',
-      headers: {
-        ...options.headers
-        // Don't set Content-Type for FormData, browser will set it with boundary
-      }
+      // Don't set Content-Type for FormData, browser will set it with boundary
     }
 
     const response = await fetch(url, config)

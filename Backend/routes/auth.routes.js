@@ -18,8 +18,8 @@ router.post('/admin/login', validateLogin, adminLogin);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password/:token', resetPassword);
 
-// Protected routes
+// Protected routes - requires valid JWT token
+router.get('/me', protect, getCurrentUser); // ADD THIS LINE
 router.post('/logout', protect, logout);
-router.get('/me', protect, getCurrentUser);
 
 export default router;

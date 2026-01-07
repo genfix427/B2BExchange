@@ -3,9 +3,9 @@ import { promisify } from 'util';
 
 // Configure Cloudinary
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
+  cloud_name: "dqx3axvon",
+  api_key: "861581431173255",
+  api_secret: "J4S68C2peZNOp_J6eLulb93_T8o"
 });
 
 const uploadAsync = promisify(cloudinary.uploader.upload);

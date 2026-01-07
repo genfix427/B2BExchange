@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import * as authService from '../../services/auth.service'
+import { authService } from '../../services/auth.service'
+
 
 export const login = createAsyncThunk(
   'auth/login',
@@ -18,6 +19,7 @@ export const logout = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       await authService.logout()
+      return null
     } catch (error) {
       return rejectWithValue(error.message)
     }
@@ -31,6 +33,10 @@ export const getCurrentUser = createAsyncThunk(
       const data = await authService.getCurrentUser()
       return data
     } catch (error) {
+      // Return null instead of rejecting to avoid infinite loading
+      if (error.statusCode === 401 || error.statusCode === 404) {
+        return null
+      }
       return rejectWithValue(error.message)
     }
   }
@@ -61,12 +67,11 @@ export const resetPassword = createAsyncThunk(
 )
 
 const initialState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
+  user: authService.getStoredUser(),
+  isAuthenticated: !!authService.getStoredUser(),
   isLoading: false,
   error: null,
-  userType: null
+  userType: localStorage.getItem('userType') || null
 }
 
 const authSlice = createSlice({
@@ -75,6 +80,11 @@ const authSlice = createSlice({
   reducers: {
     clearError: (state) => {
       state.error = null
+    },
+    setUser: (state, action) => {
+      state.user = action.payload
+      state.isAuthenticated = !!action.payload
+      state.userType = action.payload?.role
     }
   },
   extraReducers: (builder) => {
@@ -89,35 +99,60 @@ const authSlice = createSlice({
         state.isAuthenticated = true
         state.user = action.payload
         state.userType = action.payload.role
+        state.error = null
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload
+        state.isAuthenticated = false
+        state.user = null
+        state.userType = null
       })
       
       // Logout
+      .addCase(logout.pending, (state) => {
+        state.isLoading = true
+      })
       .addCase(logout.fulfilled, (state) => {
-        state.user = null
-        state.token = null
+        state.isLoading = false
         state.isAuthenticated = false
+        state.user = null
+        state.userType = null
+        state.error = null
+      })
+      .addCase(logout.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+        // Still clear auth state even if API fails
+        state.isAuthenticated = false
+        state.user = null
         state.userType = null
       })
       
       // Get Current User
       .addCase(getCurrentUser.pending, (state) => {
         state.isLoading = true
+        state.error = null
       })
       .addCase(getCurrentUser.fulfilled, (state, action) => {
         state.isLoading = false
-        state.isAuthenticated = true
-        state.user = action.payload
-        state.userType = action.payload.role
+        if (action.payload) {
+          state.isAuthenticated = true
+          state.user = action.payload
+          state.userType = action.payload.role
+        } else {
+          state.isAuthenticated = false
+          state.user = null
+          state.userType = null
+        }
+        state.error = null
       })
       .addCase(getCurrentUser.rejected, (state, action) => {
         state.isLoading = false
         state.isAuthenticated = false
         state.user = null
         state.userType = null
+        state.error = action.payload
       })
       
       // Forgot Password
@@ -148,5 +183,5 @@ const authSlice = createSlice({
   }
 })
 
-export const { clearError } = authSlice.actions
+export const { clearError, setUser } = authSlice.actions
 export default authSlice.reducer

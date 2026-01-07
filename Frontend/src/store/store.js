@@ -6,22 +6,27 @@ import authReducer from './slices/authSlice'
 import vendorReducer from './slices/vendorSlice'
 import registrationReducer from './slices/registrationSlice'
 
-const persistConfig = {
-  key: 'root',
+// Create a separate persist config for auth
+const authPersistConfig = {
+  key: 'auth',
   storage,
-  whitelist: ['auth', 'registration'] // Only persist auth and registration data
+  whitelist: ['isAuthenticated', 'user', 'userType']
+}
+
+const registrationPersistConfig = {
+  key: 'registration',
+  storage,
+  whitelist: ['formData', 'currentStep']
 }
 
 const rootReducer = combineReducers({
-  auth: authReducer,
+  auth: persistReducer(authPersistConfig, authReducer),
   vendor: vendorReducer,
-  registration: registrationReducer
+  registration: persistReducer(registrationPersistConfig, registrationReducer)
 })
 
-const persistedReducer = persistReducer(persistConfig, rootReducer)
-
 export const store = configureStore({
-  reducer: persistedReducer,
+  reducer: rootReducer,
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
       serializableCheck: {

@@ -1,14 +1,76 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import * as vendorService from '../../services/vendor.service'
+// Remove vendorService import since we'll handle API call differently
 
 export const registerVendor = createAsyncThunk(
   'registration/registerVendor',
-  async (registrationData, { rejectWithValue }) => {
+  async (documentFiles, { rejectWithValue, getState }) => {
     try {
-      const data = await vendorService.registerVendor(registrationData)
-      return data
+      const state = getState()
+      const { formData } = state.registration
+      
+      console.log('Submitting registration with:', {
+        email: formData.email,
+        documents: documentFiles.length
+      });
+
+      // Create FormData for file upload
+      const formDataToSend = new FormData()
+      
+      // Add JSON data (stringify each object)
+      if (formData.pharmacyInfo) {
+        formDataToSend.append('pharmacyInfo', JSON.stringify(formData.pharmacyInfo))
+      }
+      if (formData.pharmacyOwner) {
+        formDataToSend.append('pharmacyOwner', JSON.stringify(formData.pharmacyOwner))
+      }
+      if (formData.primaryContact) {
+        formDataToSend.append('primaryContact', JSON.stringify(formData.primaryContact))
+      }
+      if (formData.pharmacyLicense) {
+        formDataToSend.append('pharmacyLicense', JSON.stringify(formData.pharmacyLicense))
+      }
+      if (formData.pharmacyQuestions) {
+        formDataToSend.append('pharmacyQuestions', JSON.stringify(formData.pharmacyQuestions))
+      }
+      if (formData.referralInfo) {
+        formDataToSend.append('referralInfo', JSON.stringify(formData.referralInfo))
+      }
+      
+      formDataToSend.append('email', formData.email)
+      formDataToSend.append('password', formData.password)
+      
+      // Add document files
+      documentFiles.forEach((file, index) => {
+        if (file) {
+          formDataToSend.append('documents', file, file.name || `document-${index}`)
+        }
+      })
+
+      console.log('FormData entries:', Array.from(formDataToSend.entries()).map(([key, value]) => 
+        [key, typeof value === 'string' ? value.substring(0, 100) + '...' : value.name || 'File']
+      ));
+      
+      // Call the API directly
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+      const response = await fetch(`${API_BASE_URL}/vendors/register`, {
+        method: 'POST',
+        body: formDataToSend,
+        credentials: 'include',
+        // Don't set Content-Type header, browser will set it with boundary
+      })
+      
+      const data = await response.json()
+      
+      console.log('API Response:', { status: response.status, data });
+      
+      if (!response.ok) {
+        throw new Error(data.message || `Registration failed with status ${response.status}`)
+      }
+      
+      return data.data
     } catch (error) {
-      return rejectWithValue(error.message)
+      console.error('Registration error:', error);
+      return rejectWithValue(error.message || 'Registration failed. Please try again.')
     }
   }
 )
@@ -28,8 +90,8 @@ const initialState = {
     pharmacyQuestions: null,
     // Step 6
     referralInfo: null,
-    // Step 7
-    documents: null,
+    // Step 7 - Only store metadata, NOT File objects
+    documents: [],
     // Auth
     email: '',
     password: ''
@@ -38,6 +100,7 @@ const initialState = {
   error: null,
   registrationComplete: false,
   registrationId: null
+  // REMOVED: documentFiles from state
 }
 
 const registrationSlice = createSlice({
@@ -79,7 +142,15 @@ const registrationSlice = createSlice({
           state.formData.referralInfo = data
           break
         case 7:
-          state.formData.documents = data
+          // Only store metadata, NOT File objects
+          if (Array.isArray(data)) {
+            state.formData.documents = data.map(doc => ({
+              name: doc?.name || '',
+              size: doc?.size || 0,
+              type: doc?.type || '',
+              lastModified: doc?.lastModified || Date.now()
+            }))
+          }
           break
         default:
           break

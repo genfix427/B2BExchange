@@ -1,25 +1,8 @@
 import { api } from './api'
 
 export const vendorService = {
-  async registerVendor(registrationData) {
-    // Create FormData for file upload
-    const formData = new FormData()
-    
-    // Add JSON data
-    formData.append('pharmacyInfo', JSON.stringify(registrationData.pharmacyInfo))
-    formData.append('pharmacyOwner', JSON.stringify(registrationData.pharmacyOwner))
-    formData.append('primaryContact', JSON.stringify(registrationData.primaryContact))
-    formData.append('pharmacyLicense', JSON.stringify(registrationData.pharmacyLicense))
-    formData.append('pharmacyQuestions', JSON.stringify(registrationData.pharmacyQuestions))
-    formData.append('referralInfo', JSON.stringify(registrationData.referralInfo))
-    formData.append('email', registrationData.email)
-    formData.append('password', registrationData.password)
-    
-    // Add documents
-    registrationData.documents.forEach((file, index) => {
-      formData.append('documents', file)
-    })
-    
+  async registerVendor(formData) {
+    // Note: Don't set Content-Type header, browser will set it with boundary
     const response = await api.upload('/vendors/register', formData)
     return response.data
   },
@@ -31,6 +14,20 @@ export const vendorService = {
 
   async updateProfile(profileData) {
     const response = await api.put('/vendors/profile', profileData)
+    return response.data
+  },
+
+  async uploadDocument(file, documentType) {
+    const formData = new FormData()
+    formData.append('document', file)
+    formData.append('type', documentType)
+    
+    const response = await api.upload('/vendors/documents', formData)
+    return response.data
+  },
+
+  async getStats() {
+    const response = await api.get('/vendors/stats')
     return response.data
   }
 }

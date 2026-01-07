@@ -17,7 +17,7 @@ import PendingApprovalPage from './pages/auth/PendingApprovalPage'
 
 // Protected Pages
 import ProfilePage from './pages/vendor/ProfilePage'
-// import DashboardPage from './pages/vendor/DashboardPage'
+import DashboardPage from './pages/vendor/DashboardPage'
 
 // Components
 import ProtectedRoute from './components/common/ProtectedRoute'
@@ -58,7 +58,7 @@ const App = () => {
             <Route path="/pending-approval" element={<PendingApprovalPage />} />
 
             {/* Protected Routes */}
-            {/* <Route
+            <Route
               path="/dashboard"
               element={
                 <ProtectedRoute>
@@ -73,7 +73,7 @@ const App = () => {
                   )}
                 </ProtectedRoute>
               }
-            /> */}
+            />
 
             <Route
               path="/profile"

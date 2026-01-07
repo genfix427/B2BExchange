@@ -58,6 +58,28 @@ export const sendVendorApprovalEmail = async (vendorEmail, vendorName) => {
   return sendEmail(vendorEmail, subject, html);
 };
 
+export const sendVendorRejectionEmail = async (vendorEmail, vendorName, rejectionReason) => {
+  const subject = 'Application Update - Medical Marketplace';
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>Application Review Complete</h2>
+      <p>Dear ${vendorName},</p>
+      <p>Thank you for your interest in joining Medical Marketplace. After careful review of your application, we regret to inform you that we are unable to approve your vendor account at this time.</p>
+      <div style="background-color: #f8f9fa; border-left: 4px solid #dc3545; padding: 12px; margin: 16px 0;">
+        <p style="margin: 0;"><strong>Reason for rejection:</strong></p>
+        <p style="margin: 8px 0 0 0;">${rejectionReason}</p>
+      </div>
+      <p>If you believe this decision was made in error, or if you would like to address the issues mentioned above and reapply, please contact our support team.</p>
+      <p>You may submit a new application after addressing the concerns mentioned.</p>
+      <p>If you have any questions, please contact our support team.</p>
+      <br>
+      <p>Best regards,<br>Medical Marketplace Team</p>
+    </div>
+  `;
+
+  return sendEmail(vendorEmail, subject, html);
+};
+
 export const sendPasswordResetEmail = async (email, resetToken) => {
   const resetUrl = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
   const subject = 'Password Reset Request - Medical Marketplace';
@@ -74,4 +96,17 @@ export const sendPasswordResetEmail = async (email, resetToken) => {
   `;
 
   return sendEmail(email, subject, html);
+};
+
+export const sendAdminNotificationEmail = async (adminEmail, subject, message) => {
+  const html = `
+    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+      <h2>${subject}</h2>
+      <p>${message}</p>
+      <br>
+      <p>This is an automated notification from Medical Marketplace Admin System.</p>
+    </div>
+  `;
+
+  return sendEmail(adminEmail, subject, html);
 };

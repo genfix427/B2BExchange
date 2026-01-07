@@ -1,0 +1,107 @@
+export const STATES = [
+  { value: 'AL', label: 'Alabama' },
+  { value: 'AK', label: 'Alaska' },
+  { value: 'AZ', label: 'Arizona' },
+  { value: 'AR', label: 'Arkansas' },
+  { value: 'CA', label: 'California' },
+  { value: 'CO', label: 'Colorado' },
+  { value: 'CT', label: 'Connecticut' },
+  { value: 'DE', label: 'Delaware' },
+  { value: 'FL', label: 'Florida' },
+  { value: 'GA', label: 'Georgia' },
+  { value: 'HI', label: 'Hawaii' },
+  { value: 'ID', label: 'Idaho' },
+  { value: 'IL', label: 'Illinois' },
+  { value: 'IN', label: 'Indiana' },
+  { value: 'IA', label: 'Iowa' },
+  { value: 'KS', label: 'Kansas' },
+  { value: 'KY', label: 'Kentucky' },
+  { value: 'LA', label: 'Louisiana' },
+  { value: 'ME', label: 'Maine' },
+  { value: 'MD', label: 'Maryland' },
+  { value: 'MA', label: 'Massachusetts' },
+  { value: 'MI', label: 'Michigan' },
+  { value: 'MN', label: 'Minnesota' },
+  { value: 'MS', label: 'Mississippi' },
+  { value: 'MO', label: 'Missouri' },
+  { value: 'MT', label: 'Montana' },
+  { value: 'NE', label: 'Nebraska' },
+  { value: 'NV', label: 'Nevada' },
+  { value: 'NH', label: 'New Hampshire' },
+  { value: 'NJ', label: 'New Jersey' },
+  { value: 'NM', label: 'New Mexico' },
+  { value: 'NY', label: 'New York' },
+  { value: 'NC', label: 'North Carolina' },
+  { value: 'ND', label: 'North Dakota' },
+  { value: 'OH', label: 'Ohio' },
+  { value: 'OK', label: 'Oklahoma' },
+  { value: 'OR', label: 'Oregon' },
+  { value: 'PA', label: 'Pennsylvania' },
+  { value: 'RI', label: 'Rhode Island' },
+  { value: 'SC', label: 'South Carolina' },
+  { value: 'SD', label: 'South Dakota' },
+  { value: 'TN', label: 'Tennessee' },
+  { value: 'TX', label: 'Texas' },
+  { value: 'UT', label: 'Utah' },
+  { value: 'VT', label: 'Vermont' },
+  { value: 'VA', label: 'Virginia' },
+  { value: 'WA', label: 'Washington' },
+  { value: 'WV', label: 'West Virginia' },
+  { value: 'WI', label: 'Wisconsin' },
+  { value: 'WY', label: 'Wyoming' }
+]
+
+export const TIMEZONES = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' }
+]
+
+export const ENTERPRISE_TYPES = [
+  { value: 'Independent', label: 'Independent Pharmacy' },
+  { value: 'Chain', label: 'Chain Pharmacy' },
+  { value: 'Hospital', label: 'Hospital Pharmacy' },
+  { value: 'Clinic', label: 'Clinic Pharmacy' },
+  { value: 'Other', label: 'Other' }
+]
+
+export const PHARMACY_TYPES = [
+  { value: 'Retail', label: 'Retail Pharmacy' },
+  { value: 'Specialty', label: 'Specialty Pharmacy' },
+  { value: 'Compounding', label: 'Compounding Pharmacy' },
+  { value: 'Long-term Care', label: 'Long-term Care Pharmacy' },
+  { value: 'Mail Order', label: 'Mail Order Pharmacy' }
+]
+
+export const REFERRAL_SOURCES = [
+  { value: 'Search Engine', label: 'Search Engine (Google, Bing)' },
+  { value: 'Social Media', label: 'Social Media' },
+  { value: 'Referral', label: 'Referral from Another Pharmacy' },
+  { value: 'Trade Show', label: 'Trade Show/Conference' },
+  { value: 'Advertisement', label: 'Advertisement' },
+  { value: 'Other', label: 'Other' }
+]
+
+export const DOCUMENT_TYPES = [
+  'DEA License',
+  'State Pharmacy License',
+  'Business License',
+  'EIN Document',
+  'W-9 Form',
+  'Certificate of Insurance',
+  'Ownership Agreement'
+]
+
+export const ALLOWED_FILE_TYPES = [
+  'image/jpeg',
+  'image/jpg',
+  'image/png',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+]
+
+export const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB

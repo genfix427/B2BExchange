@@ -48,20 +48,40 @@ const adminSchema = new mongoose.Schema({
     canViewAnalytics: {
       type: Boolean,
       default: true
+    },
+    canManageSettings: {
+      type: Boolean,
+      default: false
+    },
+    canSuspendVendors: {
+      type: Boolean,
+      default: true
     }
-  }
+  },
+  phone: {
+    type: String,
+    validate: {
+      validator: function(v) {
+        if (!v) return true;
+        return /^[\+]?[1-9][\d]{0,15}$/.test(v);
+      },
+      message: 'Please enter a valid phone number'
+    }
+  },
+  profileImage: String,
+  notes: String
 }, {
   timestamps: true
 });
 
 // Hash password before saving
 adminSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
+  if (!this.isModified('password')) return "";
   
   try {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
-    next();
+    // next();
   } catch (error) {
     next(error);
   }

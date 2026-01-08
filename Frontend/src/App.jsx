@@ -21,6 +21,12 @@ import ProfilePage from './pages/vendor/ProfilePage'
 
 // Components
 import ProtectedRoute from './components/common/ProtectedRoute'
+import HowItWorks from './pages/HowItWorks'
+import Testimonials from './pages/Testimonials'
+import FAQ from './pages/FAQ'
+import Shipping from './pages/Shipping'
+import About from './pages/About'
+import Contact from './pages/Contact'
 
 const App = () => {
 
@@ -36,6 +42,13 @@ const App = () => {
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
+
+          <Route path='/how-it-works' element={<HowItWorks />} />
+          <Route path='/testimonials' element={<Testimonials />} />
+          <Route path='/faqs' element={<FAQ />} />
+          <Route path='/shipping' element={<Shipping />} />
+          <Route path='/about' element={<About />} />
+          <Route path='/contact' element={<Contact />} />
 
           <Route path="/pending-approval" element={<PendingApprovalPage />} />
           <Route path="/account-rejected" element={<AccountRejectedPage />} />

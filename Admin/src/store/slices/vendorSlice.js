@@ -83,14 +83,37 @@ export const approveVendor = createAsyncThunk(
   }
 )
 
+export const suspendVendor = createAsyncThunk(
+  'vendors/suspendVendor',
+  async ({ vendorId, reason }, { rejectWithValue }) => {
+    try {
+      const data = await vendorService.suspendVendor(vendorId, reason)
+      return { vendorId, reason, data }
+    } catch (error) {
+      return rejectWithValue(error.message)
+    }
+  }
+)
+
 export const rejectVendor = createAsyncThunk(
   'vendors/rejectVendor',
   async ({ vendorId, rejectionReason }, { rejectWithValue }) => {
     try {
-      const response = await vendorService.rejectVendor(vendorId, rejectionReason)
-      return { vendorId, data: response.data || response }
+      const data = await vendorService.rejectVendor(vendorId, rejectionReason)
+      return { vendorId, rejectionReason, data }
     } catch (error) {
-      console.error('Error rejecting vendor:', error)
+      return rejectWithValue(error.message)
+    }
+  }
+)
+
+export const reactivateVendor = createAsyncThunk(
+  'vendors/reactivateVendor',
+  async (vendorId, { rejectWithValue }) => {
+    try {
+      const data = await vendorService.reactivateVendor(vendorId)
+      return { vendorId, data }
+    } catch (error) {
       return rejectWithValue(error.message)
     }
   }
@@ -214,19 +237,73 @@ const vendorSlice = createSlice({
       })
       
       // Reject Vendor
+      .addCase(suspendVendor.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(suspendVendor.fulfilled, (state, action) => {
+        state.isLoading = false
+        // Update vendor status in the selected vendor
+        if (state.selectedVendor && state.selectedVendor._id === action.payload.vendorId) {
+          state.selectedVendor.status = 'suspended'
+          state.selectedVendor.suspensionReason = action.payload.reason
+          state.selectedVendor.suspendedAt = new Date().toISOString()
+        }
+        // Also update in vendors list
+        const vendorIndex = state.vendors.findIndex(v => v._id === action.payload.vendorId)
+        if (vendorIndex !== -1) {
+          state.vendors[vendorIndex].status = 'suspended'
+        }
+      })
+      .addCase(suspendVendor.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+      
+      // Reject Vendor
       .addCase(rejectVendor.pending, (state) => {
         state.isLoading = true
         state.error = null
       })
       .addCase(rejectVendor.fulfilled, (state, action) => {
         state.isLoading = false
-        // Update vendor status in list
+        // Update vendor status in the selected vendor
+        if (state.selectedVendor && state.selectedVendor._id === action.payload.vendorId) {
+          state.selectedVendor.status = 'rejected'
+          state.selectedVendor.rejectionReason = action.payload.rejectionReason
+          state.selectedVendor.rejectedAt = new Date().toISOString()
+        }
+        // Also update in vendors list
         const vendorIndex = state.vendors.findIndex(v => v._id === action.payload.vendorId)
         if (vendorIndex !== -1) {
           state.vendors[vendorIndex].status = 'rejected'
         }
       })
       .addCase(rejectVendor.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+      
+      // Reactivate Vendor
+      .addCase(reactivateVendor.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(reactivateVendor.fulfilled, (state, action) => {
+        state.isLoading = false
+        // Update vendor status in the selected vendor
+        if (state.selectedVendor && state.selectedVendor._id === action.payload.vendorId) {
+          state.selectedVendor.status = 'approved'
+          state.selectedVendor.suspensionReason = undefined
+          state.selectedVendor.suspendedAt = undefined
+        }
+        // Also update in vendors list
+        const vendorIndex = state.vendors.findIndex(v => v._id === action.payload.vendorId)
+        if (vendorIndex !== -1) {
+          state.vendors[vendorIndex].status = 'approved'
+        }
+      })
+      .addCase(reactivateVendor.rejected, (state, action) => {
         state.isLoading = false
         state.error = action.payload
       })

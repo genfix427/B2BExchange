@@ -1,19 +1,46 @@
 import { api } from './api'
+import { ApiError } from './api' // Import ApiError
 
 export const authService = {
-  async login(email, password, userType = 'vendor') {
-    const endpoint = userType === 'admin' ? '/auth/admin/login' : '/auth/vendor/login'
-    const response = await api.post(endpoint, { email, password })
-    
-    // Store minimal info in localStorage
-    if (response.success) {
-      localStorage.setItem('userType', userType)
-      localStorage.setItem('lastLogin', new Date().toISOString())
-      // Store user data in session storage for quick access
-      sessionStorage.setItem('userData', JSON.stringify(response.data))
+  async login(email, password) {
+    try {
+      const response = await api.post('/auth/vendor/login', { email, password })
+      
+      if (response.success) {
+        // Store vendor-specific info
+        localStorage.setItem('userType', 'vendor')
+        localStorage.setItem('lastLogin', new Date().toISOString())
+        
+        // Store vendor status for quick access
+        if (response.data.status) {
+          localStorage.setItem('vendorStatus', response.data.status)
+        }
+        
+        // Store user data in session storage
+        sessionStorage.setItem('userData', JSON.stringify(response.data))
+        return response.data
+      } else {
+        throw new ApiError(response.message || 'Login failed', 400)
+      }
+      
+    } catch (error) {
+      // Handle 403 errors (account not approved)
+      if (error.statusCode === 403 && error.data) {
+        // Store the status info for redirect
+        const statusData = error.data.data || error.data
+        if (statusData) {
+          localStorage.setItem('vendorStatusInfo', JSON.stringify(statusData))
+        }
+        
+        // Re-throw with better message
+        throw new ApiError(
+          error.message,
+          error.statusCode,
+          statusData
+        )
+      }
+      throw error
     }
-    
-    return response.data
   },
 
   async logout() {
@@ -21,13 +48,8 @@ export const authService = {
       await api.post('/auth/logout')
     } catch (error) {
       console.error('Logout API error:', error)
-      // Continue with cleanup even if API fails
     } finally {
-      // Clear all storage
-      localStorage.clear()
-      sessionStorage.clear()
-      // Clear cookies by setting expired date
-      document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+      this.clearStorage()
     }
   },
 
@@ -36,37 +58,86 @@ export const authService = {
       const response = await api.get('/auth/me')
       
       if (response.success) {
-        // Update session storage
-        sessionStorage.setItem('userData', JSON.stringify(response.data))
-        return response.data
+        const userData = response.data
+        
+        // Check if user is a vendor
+        if (userData.role === 'vendor') {
+          // Update session storage
+          sessionStorage.setItem('userData', JSON.stringify(userData))
+          
+          // Update vendor status
+          localStorage.setItem('vendorStatus', userData.status)
+          
+          // Check for status change (auto logout)
+          const previousStatus = localStorage.getItem('previousVendorStatus')
+          if (previousStatus && previousStatus === 'approved' && 
+              (userData.status === 'suspended' || userData.status === 'rejected')) {
+            // Auto logout vendor
+            this.clearStorage()
+            throw new ApiError('Account status changed', 403, {
+              status: userData.status,
+              rejectionReason: userData.rejectionReason,
+              suspensionReason: userData.suspensionReason
+            })
+          }
+          
+          // Store current status for next check
+          localStorage.setItem('previousVendorStatus', userData.status)
+          
+          return userData
+        } else {
+          // Non-vendor user, clear storage
+          this.clearStorage()
+          throw new ApiError('Access denied. Vendor access only.', 403)
+        }
       }
-      throw new Error('Failed to get current user')
+      throw new ApiError('Failed to get current user', 400)
     } catch (error) {
-      // If unauthorized, clear storage
-      if (error.statusCode === 401) {
+      // Clear storage on auth errors
+      if (error.statusCode === 401 || error.statusCode === 403) {
         this.clearStorage()
       }
       throw error
     }
   },
 
-  async forgotPassword(email, userType = 'Vendor') {
-    const response = await api.post('/auth/forgot-password', { email, userType })
-    return response
+  async forgotPassword(email) {
+    try {
+      const response = await api.post('/auth/forgot-password', { 
+        email, 
+        userType: 'Vendor' 
+      })
+      return response
+    } catch (error) {
+      throw new ApiError(error.message, error.statusCode)
+    }
   },
 
-  async resetPassword(token, password, userType = 'Vendor') {
-    const response = await api.post(`/auth/reset-password/${token}`, { password, userType })
-    return response
+  async resetPassword(token, password) {
+    try {
+      const response = await api.post(`/auth/reset-password/${token}`, { 
+        password, 
+        userType: 'Vendor' 
+      })
+      return response
+    } catch (error) {
+      throw new ApiError(error.message, error.statusCode)
+    }
   },
 
   // Helper methods
   clearStorage() {
-    localStorage.clear()
-    sessionStorage.clear()
+    localStorage.removeItem('userType')
+    localStorage.removeItem('lastLogin')
+    localStorage.removeItem('vendorStatus')
+    localStorage.removeItem('previousVendorStatus')
+    localStorage.removeItem('vendorStatusInfo')
+    sessionStorage.removeItem('userData')
+    // Clear cookies
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
+    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/admin;'
   },
 
-  // Add this function
   getStoredUser() {
     try {
       const userData = sessionStorage.getItem('userData')
@@ -77,13 +148,36 @@ export const authService = {
     }
   },
 
-  // Add this function
-  isAuthenticated() {
-    const userData = this.getStoredUser()
-    return !!userData
+  getVendorStatus() {
+    return localStorage.getItem('vendorStatus')
   },
 
-  getUserType() {
-    return localStorage.getItem('userType')
+  getStatusInfo() {
+    try {
+      const statusInfo = localStorage.getItem('vendorStatusInfo')
+      return statusInfo ? JSON.parse(statusInfo) : null
+    } catch (error) {
+      return null
+    }
+  },
+
+  clearStatusInfo() {
+    localStorage.removeItem('vendorStatusInfo')
+  },
+
+  isAuthenticated() {
+    const userData = this.getStoredUser()
+    return !!userData && userData.role === 'vendor'
+  },
+
+  isVendorApproved() {
+    const status = this.getVendorStatus()
+    return status === 'approved'
+  },
+
+  // Check if vendor needs to complete profile
+  isProfileComplete() {
+    const userData = this.getStoredUser()
+    return userData?.profileCompleted || false
   }
 }

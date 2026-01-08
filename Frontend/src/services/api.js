@@ -1,9 +1,10 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
 
-class ApiError extends Error {
-  constructor(message, statusCode) {
+export class ApiError extends Error {
+  constructor(message, statusCode, data = null) {
     super(message)
     this.statusCode = statusCode
+    this.data = data
     this.name = 'ApiError'
   }
 }
@@ -14,7 +15,7 @@ export const api = {
     
     const config = {
       ...options,
-      credentials: 'include', // CRITICAL: Include cookies
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
         ...options.headers
@@ -24,16 +25,22 @@ export const api = {
     try {
       const response = await fetch(url, config)
       
-      // Handle non-JSON responses
       const contentType = response.headers.get('content-type')
-      const data = contentType?.includes('application/json') 
-        ? await response.json() 
-        : await response.text()
+      let data
+      
+      if (contentType?.includes('application/json')) {
+        data = await response.json()
+      } else if (contentType?.includes('text/')) {
+        data = await response.text()
+      } else {
+        data = await response.text()
+      }
 
       if (!response.ok) {
         throw new ApiError(
-          data.message || `HTTP error! status: ${response.status}`,
-          response.status
+          data.message || data || `HTTP error! status: ${response.status}`,
+          response.status,
+          data
         )
       }
 

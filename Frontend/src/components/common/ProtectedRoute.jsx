@@ -1,40 +1,63 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
-import { useSelector, useDispatch } from 'react-redux'
-import { getCurrentUser } from '../../store/slices/authSlice'
-import LoadingSpinner from './LoadingSpinner'
+import { useSelector } from 'react-redux'
 
-const ProtectedRoute = ({ children, allowedRoles = [], requireApproval = true }) => {
-  const dispatch = useDispatch()
+const ProtectedRoute = ({ children }) => {
   const location = useLocation()
-  
-  const { isAuthenticated, isLoading, user, userType } = useSelector((state) => state.auth)
-  
-  useEffect(() => {
-    if (!isAuthenticated && !isLoading) {
-      dispatch(getCurrentUser())
-    }
-  }, [dispatch, isAuthenticated, isLoading])
-  
+  const { isAuthenticated, isLoading, user } = useSelector((state) => state.auth)
+
   if (isLoading) {
-    return <LoadingSpinner />
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    )
   }
-  
-  if (!isAuthenticated) {
-    // Redirect to login with return url
-    return <Navigate to="/login" state={{ from: location }} replace />
+
+  let redirectPath = null
+
+  // 🔹 Handle status-based redirects safely
+  const statusInfo = localStorage.getItem('vendorStatusInfo')
+  if (statusInfo) {
+    try {
+      const parsed = JSON.parse(statusInfo)
+
+      if (parsed?.status === 'rejected') {
+        redirectPath = '/account-rejected'
+      } else if (parsed?.status === 'suspended') {
+        redirectPath = '/account-suspended'
+      } else if (parsed?.status === 'pending') {
+        redirectPath = '/pending-approval'
+      }
+    } catch {
+      localStorage.removeItem('vendorStatusInfo')
+    }
   }
-  
-  // Check role authorization
-  if (allowedRoles.length > 0 && !allowedRoles.includes(userType)) {
-    return <Navigate to="/" replace />
+
+  if (redirectPath) {
+    return <Navigate to={redirectPath} replace />
   }
-  
-  // Check vendor approval status
-  if (requireApproval && userType === 'vendor' && user?.status !== 'approved') {
+
+  // 🔹 Auth check
+  if (!isAuthenticated || !user) {
+    return (
+      <Navigate
+        to={`/login?redirect=${encodeURIComponent(location.pathname)}`}
+        replace
+      />
+    )
+  }
+
+  // 🔹 Role check
+  if (user.role !== 'vendor') {
+    return <Navigate to="/login" replace />
+  }
+
+  // 🔹 Approval check
+  if (user.status !== 'approved') {
     return <Navigate to="/pending-approval" replace />
   }
-  
+
   return children
 }
 

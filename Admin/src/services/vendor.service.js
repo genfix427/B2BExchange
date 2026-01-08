@@ -89,28 +89,43 @@ export const vendorService = {
     }
   },
 
-  async rejectVendor(vendorId, rejectionReason) {
-    console.log('Rejecting vendor:', vendorId, 'with reason:', rejectionReason)
-    try {
-      const response = await api.put(`/admin/vendors/${vendorId}/reject`, { rejectionReason })
-      console.log('rejectVendor response:', response)
-      return response
-    } catch (error) {
-      console.error('Error in rejectVendor:', error)
-      throw error
-    }
-  },
+  // async rejectVendor(vendorId, rejectionReason) {
+  //   console.log('Rejecting vendor:', vendorId, 'with reason:', rejectionReason)
+  //   try {
+  //     const response = await api.put(`/admin/vendors/${vendorId}/reject`, { rejectionReason })
+  //     console.log('rejectVendor response:', response)
+  //     return response
+  //   } catch (error) {
+  //     console.error('Error in rejectVendor:', error)
+  //     throw error
+  //   }
+  // },
+
+  // async suspendVendor(vendorId, reason) {
+  //   console.log('Suspending vendor:', vendorId, 'with reason:', reason)
+  //   try {
+  //     const response = await api.put(`/admin/vendors/${vendorId}/suspend`, { reason })
+  //     console.log('suspendVendor response:', response)
+  //     return response
+  //   } catch (error) {
+  //     console.error('Error in suspendVendor:', error)
+  //     throw error
+  //   }
+  // },
 
   async suspendVendor(vendorId, reason) {
-    console.log('Suspending vendor:', vendorId, 'with reason:', reason)
-    try {
-      const response = await api.put(`/admin/vendors/${vendorId}/suspend`, { reason })
-      console.log('suspendVendor response:', response)
-      return response
-    } catch (error) {
-      console.error('Error in suspendVendor:', error)
-      throw error
-    }
+    const response = await api.put(`/admin/vendors/${vendorId}/suspend`, { reason })
+    return response
+  },
+
+  async rejectVendor(vendorId, rejectionReason) {
+    const response = await api.put(`/admin/vendors/${vendorId}/reject`, { rejectionReason })
+    return response
+  },
+
+  async reactivateVendor(vendorId) {
+    const response = await api.put(`/admin/vendors/${vendorId}/reactivate`)
+    return response
   },
 
   async getVendorStats() {

@@ -1,15 +1,27 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
 import { authService } from '../../services/auth.service'
-
+import { ApiError } from '../../services/api'
 
 export const login = createAsyncThunk(
   'auth/login',
-  async ({ email, password, userType }, { rejectWithValue }) => {
+  async ({ email, password }, { rejectWithValue }) => {
     try {
-      const data = await authService.login(email, password, userType)
+      const data = await authService.login(email, password)
       return data
     } catch (error) {
-      return rejectWithValue(error.message)
+      // Handle vendor status errors (403)
+      if (error instanceof ApiError && error.statusCode === 403) {
+        // Return the status info for redirect
+        return rejectWithValue({
+          message: error.message,
+          data: error.data,
+          isStatusError: true
+        })
+      }
+      return rejectWithValue({
+        message: error.message || 'Login failed',
+        isStatusError: false
+      })
     }
   }
 )
@@ -21,6 +33,8 @@ export const logout = createAsyncThunk(
       await authService.logout()
       return null
     } catch (error) {
+      // Still clear local state even if API fails
+      authService.clearStorage()
       return rejectWithValue(error.message)
     }
   }
@@ -33,20 +47,31 @@ export const getCurrentUser = createAsyncThunk(
       const data = await authService.getCurrentUser()
       return data
     } catch (error) {
-      // Return null instead of rejecting to avoid infinite loading
-      if (error.statusCode === 401 || error.statusCode === 404) {
+      // Handle status change errors
+      if (error instanceof ApiError && error.statusCode === 403) {
+        return rejectWithValue({
+          message: error.message,
+          data: error.data,
+          isStatusError: true
+        })
+      }
+      // Return null for 401 (not authenticated)
+      if (error.statusCode === 401) {
         return null
       }
-      return rejectWithValue(error.message)
+      return rejectWithValue({
+        message: error.message || 'Failed to get user',
+        isStatusError: false
+      })
     }
   }
 )
 
 export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
-  async ({ email, userType }, { rejectWithValue }) => {
+  async ({ email }, { rejectWithValue }) => {
     try {
-      const data = await authService.forgotPassword(email, userType)
+      const data = await authService.forgotPassword(email)
       return data
     } catch (error) {
       return rejectWithValue(error.message)
@@ -56,9 +81,9 @@ export const forgotPassword = createAsyncThunk(
 
 export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
-  async ({ token, password, userType }, { rejectWithValue }) => {
+  async ({ token, password }, { rejectWithValue }) => {
     try {
-      const data = await authService.resetPassword(token, password, userType)
+      const data = await authService.resetPassword(token, password)
       return data
     } catch (error) {
       return rejectWithValue(error.message)
@@ -67,11 +92,11 @@ export const resetPassword = createAsyncThunk(
 )
 
 const initialState = {
-  user: authService.getStoredUser(),
-  isAuthenticated: !!authService.getStoredUser(),
+  user: null,
+  isAuthenticated: false,
   isLoading: false,
   error: null,
-  userType: localStorage.getItem('userType') || null
+  userType: null
 }
 
 const authSlice = createSlice({
@@ -85,6 +110,12 @@ const authSlice = createSlice({
       state.user = action.payload
       state.isAuthenticated = !!action.payload
       state.userType = action.payload?.role
+    },
+    clearAuth: (state) => {
+      state.user = null
+      state.isAuthenticated = false
+      state.userType = null
+      state.error = null
     }
   },
   extraReducers: (builder) => {
@@ -98,17 +129,19 @@ const authSlice = createSlice({
         state.isLoading = false
         state.isAuthenticated = true
         state.user = action.payload
-        state.userType = action.payload.role
+        state.userType = 'vendor'
         state.error = null
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
-        state.error = action.payload
         state.isAuthenticated = false
         state.user = null
         state.userType = null
+        state.error = action.payload?.isStatusError
+          ? null
+          : action.payload?.message
       })
-      
+
       // Logout
       .addCase(logout.pending, (state) => {
         state.isLoading = true
@@ -128,7 +161,7 @@ const authSlice = createSlice({
         state.user = null
         state.userType = null
       })
-      
+
       // Get Current User
       .addCase(getCurrentUser.pending, (state) => {
         state.isLoading = true
@@ -154,7 +187,7 @@ const authSlice = createSlice({
         state.userType = null
         state.error = action.payload
       })
-      
+
       // Forgot Password
       .addCase(forgotPassword.pending, (state) => {
         state.isLoading = true
@@ -167,7 +200,7 @@ const authSlice = createSlice({
         state.isLoading = false
         state.error = action.payload
       })
-      
+
       // Reset Password
       .addCase(resetPassword.pending, (state) => {
         state.isLoading = true
@@ -183,5 +216,5 @@ const authSlice = createSlice({
   }
 })
 
-export const { clearError, setUser } = authSlice.actions
+export const { clearError, setUser, clearAuth } = authSlice.actions
 export default authSlice.reducer

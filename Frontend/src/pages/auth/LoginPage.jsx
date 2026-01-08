@@ -2,73 +2,139 @@ import React, { useState, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { login, clearError } from '../../store/slices/authSlice'
-import { Shield, Building2 } from 'lucide-react'
+import { Building2 } from 'lucide-react'
 
 const LoginPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
   const location = useLocation()
-  
-  const { isLoading, error, isAuthenticated, userType } = useSelector((state) => state.auth)
-  
+
+  const { isLoading, error, isAuthenticated, user } = useSelector((state) => state.auth)
+
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
-    userType: 'vendor'
+    password: ''
   })
-  
+
   const [formErrors, setFormErrors] = useState({})
-  
-  const from = location.state?.from?.pathname || (userType === 'admin' ? '/admin/dashboard' : '/dashboard')
-  
+  const [apiError, setApiError] = useState('')
+
+  const from = location.state?.from?.pathname || '/dashboard'
+
+  // Clear any stored status info on mount
   useEffect(() => {
-    if (isAuthenticated) {
-      navigate(from, { replace: true })
-    }
-  }, [isAuthenticated, navigate, from])
-  
-  useEffect(() => {
+    localStorage.removeItem('vendorStatusInfo')
     dispatch(clearError())
   }, [dispatch])
-  
+
+  // Handle successful authentication
+  useEffect(() => {
+    if (isAuthenticated && user?.status === 'approved') {
+      navigate(from, { replace: true })
+    }
+  }, [isAuthenticated, user, navigate, from])
+
+  // Handle stored status info (from previous failed login)
+  useEffect(() => {
+    const handleStoredStatus = () => {
+      try {
+        const statusInfo = localStorage.getItem('vendorStatusInfo')
+        if (statusInfo) {
+          const { status, rejectionReason, suspensionReason } = JSON.parse(statusInfo)
+          localStorage.removeItem('vendorStatusInfo')
+
+          handleStatusRedirect(status, rejectionReason, suspensionReason)
+        }
+      } catch (error) {
+        console.error('Error handling stored status:', error)
+        localStorage.removeItem('vendorStatusInfo')
+      }
+    }
+
+    handleStoredStatus()
+  }, [navigate])
+
   const validateForm = () => {
     const errors = {}
-    
+
     if (!formData.email.trim()) {
       errors.email = 'Email is required'
     } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
       errors.email = 'Email is invalid'
     }
-    
+
     if (!formData.password) {
       errors.password = 'Password is required'
     }
-    
+
     setFormErrors(errors)
+    setApiError('')
     return Object.keys(errors).length === 0
   }
-  
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    
-    if (!validateForm()) {
-      return
-    }
-    
-    try {
-      await dispatch(login({
-        email: formData.email,
-        password: formData.password,
-        userType: formData.userType
-      })).unwrap()
-      
-      // Navigation is handled by useEffect
-    } catch (err) {
-      // Error is already handled by the slice
-      console.error('Login failed:', err)
+
+  const handleStatusRedirect = (status, rejectionReason, suspensionReason) => {
+    switch (status) {
+      case 'pending':
+        navigate('/pending-approval', { replace: true })
+        break
+      case 'rejected':
+        navigate('/account-rejected', {
+          replace: true,
+          state: { reason: rejectionReason || 'Your application has been rejected.' }
+        })
+        break
+      case 'suspended':
+        navigate('/account-suspended', {
+          replace: true,
+          state: { reason: suspensionReason || 'Your account has been suspended.' }
+        })
+        break
+      default:
+        setApiError('Account not approved')
     }
   }
-  
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+
+    if (!validateForm()) return
+
+    try {
+      await dispatch(
+        login({
+          email: formData.email,
+          password: formData.password
+        })
+      ).unwrap()
+    } catch (err) {
+      if (err?.isStatusError) {
+        const status =
+          err?.data?.status || err?.status || err?.data?.data?.status
+
+        if (status === 'suspended') {
+          navigate('/account-suspended', { replace: true })
+          return
+        }
+
+        if (status === 'rejected') {
+          navigate('/account-rejected', { replace: true })
+          return
+        }
+
+        if (status === 'pending') {
+          navigate('/pending-approval', { replace: true })
+          return
+        }
+      }
+
+      // Only show error if NOT status-based
+      setApiError(err?.message || 'Login failed')
+    }
+
+  }
+
+
+
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
@@ -79,55 +145,23 @@ const LoginPage = () => {
             </div>
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Medical Marketplace</h2>
-              <p className="text-sm text-gray-600">B2B Pharmaceutical Platform</p>
+              <p className="text-sm text-gray-600">Vendor Portal</p>
             </div>
           </div>
         </div>
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Sign in to your account
+          Vendor Sign In
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          Or{' '}
-          <Link to="/register" className="font-medium text-blue-600 hover:text-blue-500">
-            register as a new vendor
-          </Link>
+          Access your vendor dashboard and manage your business
         </p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
         <div className="bg-white py-8 px-4 shadow sm:rounded-lg sm:px-10">
-          {/* User Type Selector */}
-          <div className="mb-6">
-            <div className="flex rounded-lg border border-gray-300 overflow-hidden">
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, userType: 'vendor' })}
-                className={`flex-1 py-3 px-4 text-sm font-medium text-center ${
-                  formData.userType === 'vendor'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Building2 className="h-5 w-5 inline-block mr-2" />
-                Vendor
-              </button>
-              <button
-                type="button"
-                onClick={() => setFormData({ ...formData, userType: 'admin' })}
-                className={`flex-1 py-3 px-4 text-sm font-medium text-center ${
-                  formData.userType === 'admin'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-50 text-gray-700 hover:bg-gray-100'
-                }`}
-              >
-                <Shield className="h-5 w-5 inline-block mr-2" />
-                Admin
-              </button>
-            </div>
-          </div>
-          
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {error && (
+            {/* API Error Display - only for non-status errors */}
+            {apiError && (
               <div className="rounded-md bg-red-50 p-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
@@ -136,12 +170,12 @@ const LoginPage = () => {
                     </svg>
                   </div>
                   <div className="ml-3">
-                    <p className="text-sm text-red-700">{error}</p>
+                    <p className="text-sm text-red-700">{apiError}</p>
                   </div>
                 </div>
               </div>
             )}
-            
+
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700">
                 Email address
@@ -153,10 +187,13 @@ const LoginPage = () => {
                   type="email"
                   autoComplete="email"
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    formErrors.email ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  onChange={(e) => {
+                    setFormData({ ...formData, email: e.target.value })
+                    setApiError('')
+                  }}
+                  className={`appearance-none block w-full px-3 py-2 border ${formErrors.email ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  placeholder="vendor@company.com"
                 />
                 {formErrors.email && (
                   <p className="mt-1 text-sm text-red-600">{formErrors.email}</p>
@@ -175,10 +212,13 @@ const LoginPage = () => {
                   type="password"
                   autoComplete="current-password"
                   value={formData.password}
-                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className={`appearance-none block w-full px-3 py-2 border ${
-                    formErrors.password ? 'border-red-300' : 'border-gray-300'
-                  } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  onChange={(e) => {
+                    setFormData({ ...formData, password: e.target.value })
+                    setApiError('')
+                  }}
+                  className={`appearance-none block w-full px-3 py-2 border ${formErrors.password ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm`}
+                  placeholder="••••••••"
                 />
                 {formErrors.password && (
                   <p className="mt-1 text-sm text-red-600">{formErrors.password}</p>
@@ -209,33 +249,31 @@ const LoginPage = () => {
                     Signing in...
                   </span>
                 ) : (
-                  'Sign in'
+                  'Sign in to Vendor Portal'
                 )}
               </button>
             </div>
           </form>
-          
-          {formData.userType === 'vendor' && (
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">New to the platform?</span>
-                </div>
-              </div>
 
-              <div className="mt-6">
-                <Link
-                  to="/register"
-                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Register as a Vendor
-                </Link>
+          <div className="mt-6">
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-gray-300" />
+              </div>
+              <div className="relative flex justify-center text-sm">
+                <span className="px-2 bg-white text-gray-500">Don't have a vendor account?</span>
               </div>
             </div>
-          )}
+
+            <div className="mt-6">
+              <Link
+                to="/register"
+                className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Register as a Vendor
+              </Link>
+            </div>
+          </div>
         </div>
       </div>
     </div>

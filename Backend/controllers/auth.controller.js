@@ -40,15 +40,39 @@ export const vendorLogin = async (req, res, next) => {
       });
     }
 
-    // Check if vendor is approved
+    // Check vendor status and return appropriate response
     if (vendor.status !== 'approved') {
+      let message = '';
+      let redirectTo = '';
+      
+      switch (vendor.status) {
+        case 'pending':
+          message = 'Account pending admin approval';
+          redirectTo = '/pending-approval';
+          break;
+        case 'rejected':
+          message = 'Account has been rejected';
+          redirectTo = '/account-rejected';
+          break;
+        case 'suspended':
+          message = 'Account has been suspended';
+          redirectTo = '/account-suspended';
+          break;
+        default:
+          message = 'Account not approved';
+          redirectTo = '/pending-approval';
+      }
+
       return res.status(403).json({
         success: false,
-        message: 'Account pending admin approval',
-        data: { 
+        message,
+        data: {
           status: vendor.status,
+          redirectTo,
           id: vendor._id,
-          email: vendor.email
+          email: vendor.email,
+          rejectionReason: vendor.rejectionReason,
+          suspensionReason: vendor.suspensionReason
         }
       });
     }

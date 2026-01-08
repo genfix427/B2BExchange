@@ -32,7 +32,7 @@ const VendorManagementPage = () => {
   const { vendors, pagination, isLoading, filters } = useSelector(
     (state) => state.vendors
   )
-  
+
   const [showFilters, setShowFilters] = useState(false)
   const [selectedStatus, setSelectedStatus] = useState(filters.status || 'all')
   const [searchQuery, setSearchQuery] = useState(filters.search || '')
@@ -100,7 +100,7 @@ const VendorManagementPage = () => {
 
   // FIX: Add safety checks for vendors array
   const vendorsArray = Array.isArray(vendors) ? vendors : []
-  
+
   // FIX: Safe stats calculation
   const stats = {
     total: vendorsArray.length,
@@ -349,11 +349,11 @@ const VendorManagementPage = () => {
                     {vendorsArray.map((vendor) => {
                       // Safely access vendor properties
                       if (!vendor) return null
-                      
-                      const businessName = vendor.pharmacyInfo?.legalBusinessName || 
-                                          vendor.pharmacyInfo?.name || 
-                                          'N/A'
-                      
+
+                      const businessName = vendor.pharmacyInfo?.legalBusinessName ||
+                        vendor.pharmacyInfo?.name ||
+                        'N/A'
+
                       const npiNumber = vendor.pharmacyInfo?.npiNumber || 'Not provided'
                       const email = vendor.pharmacyOwner?.email || vendor.email || 'N/A'
                       const phone = vendor.pharmacyOwner?.phone || vendor.primaryContact?.phone || 'No phone'
@@ -478,11 +478,10 @@ const VendorManagementPage = () => {
                         <button
                           key={pageNum}
                           onClick={() => handlePageChange(pageNum)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            pagination.page === pageNum
+                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${pagination.page === pageNum
                               ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                               : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {pageNum}
                         </button>

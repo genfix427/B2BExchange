@@ -1,83 +1,118 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+// src/services/api.js
+const API_BASE_URL = import.meta.env.VITE_ADMIN_API_BASE_URL || 'http://localhost:5000/api'
 
-class ApiError extends Error {
-  constructor(message, statusCode) {
+export class ApiError extends Error {
+  constructor(message, statusCode, data = null) {
     super(message)
     this.statusCode = statusCode
+    this.data = data
     this.name = 'ApiError'
   }
+}
+
+const getAuthToken = () => {
+  // Try to get from cookie first
+  const cookies = document.cookie.split(';').reduce((acc, cookie) => {
+    const [key, value] = cookie.trim().split('=')
+    acc[key] = value
+    return acc
+  }, {})
+  
+  return cookies.admin_token || null
 }
 
 export const api = {
   async request(endpoint, options = {}) {
     const url = `${API_BASE_URL}${endpoint}`
     
-    // Get token from multiple possible locations
-    const token = localStorage.getItem('adminToken') || 
-                  localStorage.getItem('token')
+    const headers = {
+      'Content-Type': 'application/json',
+      ...options.headers
+    }
     
-    console.log(`API Request to: ${url}`) // Debug
-    console.log(`Token exists: ${!!token}`) // Debug
-    console.log(`Token value: ${token ? `${token.substring(0, 20)}...` : 'none'}`) // Debug
+    // Add auth token if available
+    const token = getAuthToken()
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
     
     const config = {
       ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token && { 'Authorization': `Bearer ${token}` }),
-        ...options.headers
-      }
+      credentials: 'include', // Include cookies
+      headers
     }
 
-    console.log('Request headers:', config.headers) // Debug
+    console.log('🌐 API Request:', {
+      url,
+      method: options.method || 'GET',
+      endpoint,
+      hasAuthToken: !!token
+    })
 
     try {
       const response = await fetch(url, config)
       
-      console.log(`Response status: ${response.status} ${response.statusText}`) // Debug
-      
-      // Handle specific status codes
-      if (response.status === 401) {
-        console.error('Unauthorized - token invalid or expired')
-        // Clear invalid token
-        localStorage.removeItem('adminToken')
-        localStorage.removeItem('token')
-        localStorage.removeItem('adminUserType')
-        
-        // Only redirect if not already on login page
-        if (!window.location.pathname.includes('/login')) {
-          window.location.href = '/admin/login'
-        }
-      }
-      
-      if (response.status === 403) {
-        console.error('Forbidden - insufficient permissions')
-      }
-      
-      const contentType = response.headers.get('content-type')
-      const data = contentType?.includes('application/json') 
-        ? await response.json() 
-        : await response.text()
+      console.log('📡 API Response:', {
+        url,
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok
+      })
 
-      console.log('Response data:', data) // Debug
+      const contentType = response.headers.get('content-type')
+      let data
+      
+      if (contentType && contentType.includes('application/json')) {
+        data = await response.json()
+      } else {
+        data = await response.text()
+      }
 
       if (!response.ok) {
+        console.error('❌ API Error:', {
+          status: response.status,
+          data
+        })
+        
+        // Handle specific status codes
+        if (response.status === 401) {
+          // Clear local storage on unauthorized
+          localStorage.removeItem('adminToken')
+          localStorage.removeItem('adminUser')
+          localStorage.removeItem('adminPermissions')
+        }
+        
         throw new ApiError(
-          data.message || `HTTP error! status: ${response.status}`,
-          response.status
+          data?.message || `HTTP error! status: ${response.status}`,
+          response.status,
+          data
         )
       }
 
+      console.log('✅ API Success:', {
+        url,
+        success: data?.success,
+        hasData: !!data?.data || !!data
+      })
+
       return data
     } catch (error) {
-      console.error('API Request failed:', error) // Debug
+      console.error('💥 API Request Error:', {
+        endpoint,
+        error: error.message,
+        statusCode: error.statusCode
+      })
+      
+      // Re-throw ApiError instances
       if (error instanceof ApiError) {
         throw error
       }
+      
+      // Handle network errors
       throw new ApiError(
         error.message || 'Network error occurred',
-        0
+        0,
+        null
       )
     }
   },
@@ -104,5 +139,22 @@ export const api = {
 
   delete(endpoint, options = {}) {
     return this.request(endpoint, { ...options, method: 'DELETE' })
+  },
+
+  // Helper method for file uploads
+  upload(endpoint, formData, options = {}) {
+    const headers = {
+      ...options.headers
+    }
+    
+    // Remove Content-Type for multipart/form-data
+    delete headers['Content-Type']
+    
+    return this.request(endpoint, {
+      ...options,
+      method: 'POST',
+      body: formData,
+      headers
+    })
   }
 }

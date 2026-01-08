@@ -1,173 +1,96 @@
 import { api } from './api'
-import { ApiError } from './api' // Import ApiError
 
 export const authService = {
   async login(email, password) {
-    try {
-      const response = await api.post('/auth/vendor/login', { email, password })
-      
-      if (response.success) {
-        // Store vendor-specific info
-        localStorage.setItem('userType', 'vendor')
-        localStorage.setItem('lastLogin', new Date().toISOString())
-        
-        // Store vendor status for quick access
-        if (response.data.status) {
-          localStorage.setItem('vendorStatus', response.data.status)
-        }
-        
-        // Store user data in session storage
-        sessionStorage.setItem('userData', JSON.stringify(response.data))
-        return response.data
-      } else {
-        throw new ApiError(response.message || 'Login failed', 400)
-      }
-      
-    } catch (error) {
-      // Handle 403 errors (account not approved)
-      if (error.statusCode === 403 && error.data) {
-        // Store the status info for redirect
-        const statusData = error.data.data || error.data
-        if (statusData) {
-          localStorage.setItem('vendorStatusInfo', JSON.stringify(statusData))
-        }
-        
-        // Re-throw with better message
-        throw new ApiError(
-          error.message,
-          error.statusCode,
-          statusData
-        )
-      }
-      throw error
+    const response = await api.post('/vendor/auth/login', { email, password })
+    
+    if (response.success) {
+      // Store vendor info
+      localStorage.setItem('vendorToken', 'true')
+      localStorage.setItem('vendorUser', JSON.stringify(response.data))
+      localStorage.setItem('vendorLastLogin', new Date().toISOString())
+      localStorage.setItem('vendorStatus', response.data.status)
     }
+    
+    return response.data
   },
 
   async logout() {
     try {
-      await api.post('/auth/logout')
+      await api.post('/vendor/auth/logout')
     } catch (error) {
-      console.error('Logout API error:', error)
+      console.error('Vendor logout API error:', error)
     } finally {
-      this.clearStorage()
+      this.clearVendorStorage()
     }
   },
 
-  async getCurrentUser() {
+  async getCurrentVendor() {
     try {
-      const response = await api.get('/auth/me')
+      const response = await api.get('/vendor/auth/me')
       
       if (response.success) {
-        const userData = response.data
+        const vendorData = response.data
         
-        // Check if user is a vendor
-        if (userData.role === 'vendor') {
-          // Update session storage
-          sessionStorage.setItem('userData', JSON.stringify(userData))
-          
-          // Update vendor status
-          localStorage.setItem('vendorStatus', userData.status)
-          
-          // Check for status change (auto logout)
-          const previousStatus = localStorage.getItem('previousVendorStatus')
-          if (previousStatus && previousStatus === 'approved' && 
-              (userData.status === 'suspended' || userData.status === 'rejected')) {
-            // Auto logout vendor
-            this.clearStorage()
-            throw new ApiError('Account status changed', 403, {
-              status: userData.status,
-              rejectionReason: userData.rejectionReason,
-              suspensionReason: userData.suspensionReason
-            })
-          }
-          
-          // Store current status for next check
-          localStorage.setItem('previousVendorStatus', userData.status)
-          
-          return userData
-        } else {
-          // Non-vendor user, clear storage
-          this.clearStorage()
-          throw new ApiError('Access denied. Vendor access only.', 403)
-        }
+        // Update localStorage
+        localStorage.setItem('vendorUser', JSON.stringify(vendorData))
+        localStorage.setItem('vendorStatus', vendorData.status)
+        
+        return vendorData
       }
-      throw new ApiError('Failed to get current user', 400)
+      throw new Error('Failed to get current vendor')
     } catch (error) {
-      // Clear storage on auth errors
+      // If unauthorized or status changed, clear storage
       if (error.statusCode === 401 || error.statusCode === 403) {
-        this.clearStorage()
+        this.clearVendorStorage()
       }
       throw error
     }
   },
 
   async forgotPassword(email) {
-    try {
-      const response = await api.post('/auth/forgot-password', { 
-        email, 
-        userType: 'Vendor' 
-      })
-      return response
-    } catch (error) {
-      throw new ApiError(error.message, error.statusCode)
-    }
+    const response = await api.post('/vendor/auth/forgot-password', { email })
+    return response
   },
 
   async resetPassword(token, password) {
-    try {
-      const response = await api.post(`/auth/reset-password/${token}`, { 
-        password, 
-        userType: 'Vendor' 
-      })
-      return response
-    } catch (error) {
-      throw new ApiError(error.message, error.statusCode)
-    }
+    const response = await api.post(`/vendor/auth/reset-password/${token}`, { password })
+    return response
+  },
+
+  async updateProfile(profileData) {
+    const response = await api.put('/vendor/auth/profile', profileData)
+    return response
   },
 
   // Helper methods
-  clearStorage() {
-    localStorage.removeItem('userType')
-    localStorage.removeItem('lastLogin')
+  clearVendorStorage() {
+    localStorage.removeItem('vendorToken')
+    localStorage.removeItem('vendorUser')
+    localStorage.removeItem('vendorLastLogin')
     localStorage.removeItem('vendorStatus')
-    localStorage.removeItem('previousVendorStatus')
-    localStorage.removeItem('vendorStatusInfo')
-    sessionStorage.removeItem('userData')
-    // Clear cookies
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
-    document.cookie = 'token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/admin;'
+    // Clear vendor cookies
+    document.cookie = 'vendor_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;'
   },
 
-  getStoredUser() {
+  getStoredVendor() {
     try {
-      const userData = sessionStorage.getItem('userData')
-      return userData ? JSON.parse(userData) : null
+      const vendorData = localStorage.getItem('vendorUser')
+      return vendorData ? JSON.parse(vendorData) : null
     } catch (error) {
-      console.error('Error parsing stored user data:', error)
+      console.error('Error parsing stored vendor data:', error)
       return null
     }
+  },
+
+  isVendorAuthenticated() {
+    const vendorData = this.getStoredVendor()
+    const hasToken = !!localStorage.getItem('vendorToken')
+    return !!vendorData && hasToken
   },
 
   getVendorStatus() {
     return localStorage.getItem('vendorStatus')
-  },
-
-  getStatusInfo() {
-    try {
-      const statusInfo = localStorage.getItem('vendorStatusInfo')
-      return statusInfo ? JSON.parse(statusInfo) : null
-    } catch (error) {
-      return null
-    }
-  },
-
-  clearStatusInfo() {
-    localStorage.removeItem('vendorStatusInfo')
-  },
-
-  isAuthenticated() {
-    const userData = this.getStoredUser()
-    return !!userData && userData.role === 'vendor'
   },
 
   isVendorApproved() {
@@ -175,9 +98,8 @@ export const authService = {
     return status === 'approved'
   },
 
-  // Check if vendor needs to complete profile
   isProfileComplete() {
-    const userData = this.getStoredUser()
-    return userData?.profileCompleted || false
+    const vendor = this.getStoredVendor()
+    return vendor?.profileCompleted || false
   }
 }

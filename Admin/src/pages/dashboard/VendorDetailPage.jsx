@@ -8,6 +8,7 @@ import {
   suspendVendor,
   reactivateVendor
 } from '../../store/slices/vendorSlice'
+import { Upload } from 'lucide-react';
 import {
   ArrowLeft,
   Building,
@@ -38,9 +39,30 @@ import {
   BarChart,
   History,
   Globe,
-  MapPin as MapPinIcon
+  MapPin as MapPinIcon,
+  Tag,
+  Percent,
+  Award,
+  Star,
+  TrendingUp,
+  Users as UsersIcon,
+  FileSearch,
+  Briefcase,
+  CheckSquare,
+  XSquare,
+  PauseCircle,
+  PlayCircle,
+  Edit,
+  Trash2,
+  Copy,
+  Share2,
+  Printer,
+  MessageSquare,
+  Bell,
+  Eye,
+  EyeOff
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, formatDistanceToNow } from 'date-fns'
 
 const VendorDetailPage = () => {
   const { id } = useParams()
@@ -54,6 +76,8 @@ const VendorDetailPage = () => {
   const [showSuspendModal, setShowSuspendModal] = useState(false)
   const [suspensionReason, setSuspensionReason] = useState('')
   const [showReactivateModal, setShowReactivateModal] = useState(false)
+  const [showDocuments, setShowDocuments] = useState(false)
+  const [selectedDocument, setSelectedDocument] = useState(null)
 
   useEffect(() => {
     if (id) {
@@ -124,10 +148,10 @@ const VendorDetailPage = () => {
 
   const getStatusColor = (status) => {
     const colors = {
-      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
-      approved: { bg: 'bg-green-100', text: 'text-green-800' },
-      rejected: { bg: 'bg-red-100', text: 'text-red-800' },
-      suspended: { bg: 'bg-gray-100', text: 'text-gray-800' }
+      pending: { bg: 'bg-yellow-100', text: 'text-yellow-800', icon: <Clock className="w-4 h-4" /> },
+      approved: { bg: 'bg-green-100', text: 'text-green-800', icon: <CheckCircle className="w-4 h-4" /> },
+      rejected: { bg: 'bg-red-100', text: 'text-red-800', icon: <XCircle className="w-4 h-4" /> },
+      suspended: { bg: 'bg-gray-100', text: 'text-gray-800', icon: <PauseCircle className="w-4 h-4" /> }
     }
     return colors[status] || colors.pending
   }
@@ -149,15 +173,38 @@ const VendorDetailPage = () => {
       address.line2 || address.address2,
       address.city,
       address.state,
-      address.zipCode || address.zip
+      address.zipCode || address.zip,
+      address.country
     ].filter(Boolean)
     return parts.join(', ')
+  }
+
+  const getDocumentCount = () => {
+    if (!selectedVendor?.documents) return 0
+    return Array.isArray(selectedVendor.documents) ? selectedVendor.documents.length : 0
+  }
+
+  const getDocumentList = () => {
+    if (!selectedVendor?.documents) return []
+    return Array.isArray(selectedVendor.documents) ? selectedVendor.documents : []
+  }
+
+  const viewDocument = (document) => {
+    setSelectedDocument(document)
+    setShowDocuments(true)
+  }
+
+  const downloadDocument = (document) => {
+    if (document.url) {
+      window.open(document.url, '_blank')
+    }
   }
 
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <span className="ml-4 text-gray-600">Loading vendor details...</span>
       </div>
     )
   }
@@ -196,8 +243,18 @@ const VendorDetailPage = () => {
     )
   }
 
-  const { bg: statusBg, text: statusText } = getStatusColor(selectedVendor.status)
-  const StatusIcon = getStatusIcon(selectedVendor.status)
+  const { bg: statusBg, text: statusText, icon: StatusIcon } = getStatusColor(selectedVendor.status)
+
+  // Calculate some stats for display
+  const stats = {
+    documents: getDocumentCount(),
+    locations: selectedVendor.pharmacyQuestions?.numberOfLocations || 1,
+    yearsInBusiness: selectedVendor.pharmacyQuestions?.yearsInBusiness || 'N/A',
+    totalOrders: 156, // Placeholder
+    totalRevenue: '$12,458', // Placeholder
+    completionRate: '92%', // Placeholder
+    rating: '4.8' // Placeholder
+  }
 
   return (
     <div className="space-y-6">
@@ -217,7 +274,7 @@ const VendorDetailPage = () => {
             <div className="flex items-center mt-1 space-x-2">
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBg} ${statusText}`}>
                 {StatusIcon}
-                {selectedVendor.status?.charAt(0).toUpperCase() + selectedVendor.status?.slice(1)}
+                <span className="ml-1">{selectedVendor.status?.charAt(0).toUpperCase() + selectedVendor.status?.slice(1)}</span>
               </span>
               <span className="text-sm text-gray-500">
                 ID: {selectedVendor._id?.slice(-8)}
@@ -230,19 +287,19 @@ const VendorDetailPage = () => {
             </div>
           </div>
         </div>
-        <div className="mt-4 sm:mt-0 flex space-x-3">
+        <div className="mt-4 sm:mt-0 flex flex-wrap gap-2">
           {selectedVendor.status === 'pending' && (
             <>
               <button
                 onClick={handleApprove}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700"
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Approve
               </button>
               <button
                 onClick={() => setShowRejectModal(true)}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
               >
                 <XCircle className="w-4 h-4 mr-2" />
                 Reject
@@ -252,7 +309,7 @@ const VendorDetailPage = () => {
           {selectedVendor.status === 'approved' && (
             <button
               onClick={() => setShowSuspendModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-yellow-600 hover:bg-yellow-700"
             >
               <Lock className="w-4 h-4 mr-2" />
               Suspend
@@ -261,16 +318,89 @@ const VendorDetailPage = () => {
           {selectedVendor.status === 'suspended' && (
             <button
               onClick={() => setShowReactivateModal(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
             >
               <Unlock className="w-4 h-4 mr-2" />
               Reactivate
             </button>
           )}
-          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-            <MoreVertical className="w-4 h-4 mr-2" />
-            More
+          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <Edit className="w-4 h-4 mr-2" />
+            Edit
           </button>
+          <button className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+            <MoreVertical className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <FileText className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Documents</p>
+              <p className="text-xl font-bold text-gray-900">{stats.documents}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-green-100 rounded-lg">
+              <Store className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Locations</p>
+              <p className="text-xl font-bold text-gray-900">{stats.locations}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Calendar className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Years</p>
+              <p className="text-xl font-bold text-gray-900">{stats.yearsInBusiness}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-orange-100 rounded-lg">
+              <ShoppingCart className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Orders</p>
+              <p className="text-xl font-bold text-gray-900">{stats.totalOrders}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <DollarSign className="w-6 h-6 text-indigo-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Revenue</p>
+              <p className="text-xl font-bold text-gray-900">{stats.totalRevenue}</p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-pink-100 rounded-lg">
+              <Star className="w-6 h-6 text-pink-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Rating</p>
+              <p className="text-xl font-bold text-gray-900">{stats.rating}/5</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -278,14 +408,14 @@ const VendorDetailPage = () => {
       <div className="border-b border-gray-200">
         <nav className="-mb-px flex space-x-8 overflow-x-auto">
           {[
-            { id: 'info', label: 'Information', icon: Store },
-            { id: 'documents', label: 'Documents', icon: FileText },
+            { id: 'info', label: 'Information', icon: Briefcase },
+            { id: 'documents', label: 'Documents', icon: FileText, badge: getDocumentCount() },
+            { id: 'contacts', label: 'Contacts', icon: UsersIcon },
+            { id: 'licenses', label: 'Licenses', icon: Shield },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
-            { id: 'products', label: 'Products', icon: Package2 },
-            { id: 'transactions', label: 'Transactions', icon: CreditCard },
-            { id: 'activity', label: 'Activity', icon: History },
-            { id: 'analytics', label: 'Analytics', icon: BarChart }
-          ].map(({ id, label, icon: Icon }) => (
+            { id: 'analytics', label: 'Analytics', icon: BarChart },
+            { id: 'history', label: 'History', icon: History }
+          ].map(({ id, label, icon: Icon, badge }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -297,22 +427,27 @@ const VendorDetailPage = () => {
             >
               <Icon className="w-4 h-4 mr-2" />
               {label}
+              {badge && (
+                <span className="ml-2 bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+                  {badge}
+                </span>
+              )}
             </button>
           ))}
         </nav>
       </div>
 
       {/* Tab Content */}
-      <div className="bg-white shadow rounded-lg">
+      <div className="bg-white shadow rounded-lg overflow-hidden">
         {/* Information Tab */}
         {activeTab === 'info' && (
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left Column - Business Info */}
+              {/* Left Column */}
               <div className="space-y-6">
                 {/* Business Information */}
-                <div className="bg-white border border-gray-200 rounded-lg p-5">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <Building className="w-5 h-5 mr-2 text-gray-500" />
                     Business Information
                   </h3>
@@ -358,8 +493,8 @@ const VendorDetailPage = () => {
                 </div>
 
                 {/* Contact Information */}
-                <div className="bg-white border border-gray-200 rounded-lg p-5">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <User className="w-5 h-5 mr-2 text-gray-500" />
                     Contact Information
                   </h3>
@@ -398,77 +533,24 @@ const VendorDetailPage = () => {
                         </p>
                       </div>
                     </div>
-                    {selectedVendor.primaryContact && (
-                      <div className="pt-4 border-t border-gray-100">
-                        <h4 className="text-sm font-medium text-gray-700 mb-2">Primary Contact</h4>
-                        <p className="text-sm text-gray-900">
-                          {selectedVendor.primaryContact?.firstName} {selectedVendor.primaryContact?.lastName}
-                          {selectedVendor.primaryContact?.title && ` • ${selectedVendor.primaryContact.title}`}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          {selectedVendor.primaryContact?.email && `${selectedVendor.primaryContact.email} • `}
-                          {selectedVendor.primaryContact?.phone || selectedVendor.primaryContact?.mobile}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* License Information */}
-                <div className="bg-white border border-gray-200 rounded-lg p-5">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                    <Shield className="w-5 h-5 mr-2 text-gray-500" />
-                    License Information
-                  </h3>
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">DEA Number</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.deaNumber || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">DEA Expiration</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.deaExpirationDate ? 
-                            format(new Date(selectedVendor.pharmacyLicense.deaExpirationDate), 'MMM d, yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">State License</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.stateLicenseNumber || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">License Expiration</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.stateLicenseExpirationDate ? 
-                            format(new Date(selectedVendor.pharmacyLicense.stateLicenseExpirationDate), 'MMM d, yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* Right Column - Status & Additional Info */}
+              {/* Right Column */}
               <div className="space-y-6">
                 {/* Account Status */}
-                <div className="bg-gray-50 rounded-lg p-5 border border-gray-200">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <Shield className="w-5 h-5 mr-2 text-gray-500" />
                     Account Status
                   </h3>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-gray-600">Current Status</span>
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusBg} ${statusText}`}>
                         {StatusIcon}
-                        {selectedVendor.status?.charAt(0).toUpperCase() + selectedVendor.status?.slice(1)}
+                        <span className="ml-1">{selectedVendor.status?.charAt(0).toUpperCase() + selectedVendor.status?.slice(1)}</span>
                       </span>
                     </div>
                     
@@ -480,6 +562,9 @@ const VendorDetailPage = () => {
                         </span>
                         <span className="text-sm text-gray-900">
                           {format(new Date(selectedVendor.registeredAt), 'MMM d, yyyy')}
+                          <span className="ml-2 text-xs text-gray-400">
+                            ({formatDistanceToNow(new Date(selectedVendor.registeredAt), { addSuffix: true })})
+                          </span>
                         </span>
                       </div>
                     )}
@@ -531,13 +616,53 @@ const VendorDetailPage = () => {
                   </div>
                 </div>
 
+                {/* License Information */}
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <FileCheck className="w-5 h-5 mr-2 text-gray-500" />
+                    License Information
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500">DEA Number</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {selectedVendor.pharmacyLicense?.deaNumber || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500">DEA Expiration</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {selectedVendor.pharmacyLicense?.deaExpirationDate ? 
+                            format(new Date(selectedVendor.pharmacyLicense.deaExpirationDate), 'MMM d, yyyy') : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500">State License</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {selectedVendor.pharmacyLicense?.stateLicenseNumber || 'N/A'}
+                        </p>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-500">License Expiration</label>
+                        <p className="mt-1 text-sm text-gray-900">
+                          {selectedVendor.pharmacyLicense?.stateLicenseExpirationDate ? 
+                            format(new Date(selectedVendor.pharmacyLicense.stateLicenseExpirationDate), 'MMM d, yyyy') : 'N/A'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Business Details */}
-                <div className="bg-white border border-gray-200 rounded-lg p-5">
-                  <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+                <div className="border border-gray-200 rounded-lg p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <Store className="w-5 h-5 mr-2 text-gray-500" />
                     Business Details
                   </h3>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {selectedVendor.pharmacyQuestions?.enterpriseType && (
                       <div className="flex justify-between">
                         <span className="text-sm text-gray-600">Enterprise Type</span>
@@ -570,49 +695,6 @@ const VendorDetailPage = () => {
                     )}
                   </div>
                 </div>
-
-                {/* Quick Stats */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <DollarSign className="w-8 h-8 text-blue-600" />
-                      <div className="ml-3">
-                        <p className="text-sm text-blue-900">Total Sales</p>
-                        <p className="text-xl font-semibold text-blue-900">$12,458</p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="bg-green-50 rounded-lg p-4">
-                    <div className="flex items-center">
-                      <Package className="w-8 h-8 text-green-600" />
-                      <div className="ml-3">
-                        <p className="text-sm text-green-900">Total Orders</p>
-                        <p className="text-xl font-semibold text-green-900">156</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Referral Info */}
-                {selectedVendor.referralInfo && (
-                  <div className="bg-purple-50 rounded-lg p-5">
-                    <h3 className="text-lg font-medium text-purple-900 mb-3">Referral Information</h3>
-                    <div className="space-y-2">
-                      {selectedVendor.referralInfo.referralSource && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-purple-700">Source</span>
-                          <span className="text-sm font-medium text-purple-900">{selectedVendor.referralInfo.referralSource}</span>
-                        </div>
-                      )}
-                      {selectedVendor.referralInfo.promoCode && (
-                        <div className="flex justify-between">
-                          <span className="text-sm text-purple-700">Promo Code</span>
-                          <span className="text-sm font-medium text-purple-900">{selectedVendor.referralInfo.promoCode}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -622,15 +704,27 @@ const VendorDetailPage = () => {
         {activeTab === 'documents' && (
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-lg font-medium text-gray-900">Documents & Licenses</h3>
-              <button className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
-                <Download className="w-4 h-4 mr-2" />
-                Download All
-              </button>
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Documents & Licenses</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  {getDocumentCount()} document{getDocumentCount() !== 1 ? 's' : ''} uploaded
+                </p>
+              </div>
+              <div className="flex space-x-2">
+                <button className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload
+                </button>
+                <button className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download All
+                </button>
+              </div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {selectedVendor.documents && selectedVendor.documents.length > 0 ? (
-                selectedVendor.documents.map((doc, index) => (
+            
+            {getDocumentCount() > 0 ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {getDocumentList().map((doc, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start">
                       <FileText className="w-8 h-8 text-gray-400 flex-shrink-0" />
@@ -641,112 +735,180 @@ const VendorDetailPage = () => {
                         <p className="text-sm text-gray-500 mt-1">
                           Uploaded: {doc.uploadedAt ? format(new Date(doc.uploadedAt), 'MMM d, yyyy') : 'Recently'}
                         </p>
+                        {doc.size && (
+                          <p className="text-xs text-gray-400 mt-1">
+                            Size: {doc.size}
+                          </p>
+                        )}
                         <div className="mt-3 flex items-center space-x-3">
                           {doc.url && (
-                            <a
-                              href={doc.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center text-sm text-blue-600 hover:text-blue-500"
-                            >
-                              <ExternalLink className="w-4 h-4 mr-1" />
-                              View
-                            </a>
-                          )}
-                          {doc.url && (
-                            <a
-                              href={doc.url}
-                              download
-                              className="inline-flex items-center text-sm text-gray-600 hover:text-gray-500"
-                            >
-                              <Download className="w-4 h-4 mr-1" />
-                              Download
-                            </a>
+                            <>
+                              <button
+                                onClick={() => viewDocument(doc)}
+                                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-500"
+                              >
+                                <Eye className="w-4 h-4 mr-1" />
+                                View
+                              </button>
+                              <button
+                                onClick={() => downloadDocument(doc)}
+                                className="inline-flex items-center text-sm text-gray-600 hover:text-gray-500"
+                              >
+                                <Download className="w-4 h-4 mr-1" />
+                                Download
+                              </button>
+                            </>
                           )}
                         </div>
                       </div>
                     </div>
                   </div>
-                ))
-              ) : (
-                <div className="col-span-full text-center py-12">
-                  <FileText className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No documents uploaded</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    The vendor has not uploaded any documents.
-                  </p>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <FileText className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No documents uploaded</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  The vendor has not uploaded any documents.
+                </p>
+                <button className="mt-4 inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Request Documents
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Contacts Tab */}
+        {activeTab === 'contacts' && (
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Primary Contact */}
+              <div className="border border-gray-200 rounded-lg p-5">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Primary Contact</h3>
+                <div className="space-y-4">
+                  <div className="flex items-center">
+                    <User className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">
+                        {selectedVendor.pharmacyOwner?.firstName || ''} {selectedVendor.pharmacyOwner?.lastName || ''}
+                      </p>
+                      <p className="text-sm text-gray-500">{selectedVendor.pharmacyOwner?.title || 'Owner'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Mail className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm text-gray-900">{selectedVendor.pharmacyOwner?.email || selectedVendor.email}</p>
+                      <p className="text-xs text-gray-500">Email</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center">
+                    <Phone className="w-5 h-5 text-gray-400 mr-3" />
+                    <div>
+                      <p className="text-sm text-gray-900">
+                        {selectedVendor.pharmacyOwner?.phone || selectedVendor.pharmacyOwner?.mobile || 'N/A'}
+                      </p>
+                      <p className="text-xs text-gray-500">Phone</p>
+                    </div>
+                  </div>
                 </div>
-              )}
+              </div>
+
+              {/* Additional Contacts */}
+              <div className="border border-gray-200 rounded-lg p-5">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Additional Contacts</h3>
+                <div className="space-y-4">
+                  {selectedVendor.additionalContacts && selectedVendor.additionalContacts.length > 0 ? (
+                    selectedVendor.additionalContacts.map((contact, index) => (
+                      <div key={index} className="border-t pt-4 first:border-t-0 first:pt-0">
+                        <div className="flex items-center">
+                          <UsersIcon className="w-5 h-5 text-gray-400 mr-3" />
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {contact.firstName} {contact.lastName}
+                            </p>
+                            <p className="text-sm text-gray-500">{contact.title || 'Contact'}</p>
+                          </div>
+                        </div>
+                        <div className="mt-2 space-y-1">
+                          {contact.email && (
+                            <p className="text-sm text-gray-600 flex items-center">
+                              <Mail className="w-3 h-3 mr-2" />
+                              {contact.email}
+                            </p>
+                          )}
+                          {contact.phone && (
+                            <p className="text-sm text-gray-600 flex items-center">
+                              <Phone className="w-3 h-3 mr-2" />
+                              {contact.phone}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-gray-500">No additional contacts</p>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Orders Tab */}
+        {/* Other Tabs - Placeholder Content */}
+        {activeTab === 'licenses' && (
+          <div className="p-6">
+            <div className="text-center py-12">
+              <Shield className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">License Management</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Detailed license information and renewals coming soon.
+              </p>
+            </div>
+          </div>
+        )}
+
         {activeTab === 'orders' && (
           <div className="p-6">
             <div className="text-center py-12">
               <ShoppingCart className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Order Management</h3>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">Order History</h3>
               <p className="mt-1 text-sm text-gray-500">
-                This feature will be available soon. Integration with order system is in progress.
+                Order management system integration in progress.
               </p>
             </div>
           </div>
         )}
 
-        {/* Products Tab */}
-        {activeTab === 'products' && (
-          <div className="p-6">
-            <div className="text-center py-12">
-              <Package2 className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Product Catalog</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Product management system will be integrated in the next release.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Transactions Tab */}
-        {activeTab === 'transactions' && (
-          <div className="p-6">
-            <div className="text-center py-12">
-              <CreditCard className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Transaction History</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Payment gateway integration is required for this feature.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Activity Tab */}
-        {activeTab === 'activity' && (
-          <div className="p-6">
-            <div className="text-center py-12">
-              <History className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">Activity Log</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Activity tracking will be enabled in future updates.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <div className="p-6">
             <div className="text-center py-12">
               <BarChart className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">Vendor Analytics</h3>
               <p className="mt-1 text-sm text-gray-500">
-                Analytics dashboard is under development.
+                Analytics dashboard will be available soon.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'history' && (
+          <div className="p-6">
+            <div className="text-center py-12">
+              <History className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">Activity History</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                Activity tracking system under development.
               </p>
             </div>
           </div>
         )}
       </div>
 
+      {/* Modals */}
       {/* Reject Modal */}
       {showRejectModal && (
         <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">

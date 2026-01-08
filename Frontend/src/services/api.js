@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000/api'
+const API_BASE_URL = import.meta.env.VITE_VENDOR_API_BASE_URL || 'http://localhost:5000/api'
 
 export class ApiError extends Error {
   constructor(message, statusCode, data = null) {
@@ -15,9 +15,10 @@ export const api = {
     
     const config = {
       ...options,
-      credentials: 'include',
+      credentials: 'include', // CRITICAL: Include cookies for vendor_token
       headers: {
         'Content-Type': 'application/json',
+        'X-User-Type': 'vendor', // Specify user type
         ...options.headers
       }
     }
@@ -25,20 +26,23 @@ export const api = {
     try {
       const response = await fetch(url, config)
       
+      // Handle non-JSON responses
       const contentType = response.headers.get('content-type')
-      let data
-      
-      if (contentType?.includes('application/json')) {
-        data = await response.json()
-      } else if (contentType?.includes('text/')) {
-        data = await response.text()
-      } else {
-        data = await response.text()
-      }
+      const data = contentType?.includes('application/json') 
+        ? await response.json() 
+        : await response.text()
 
       if (!response.ok) {
+        // Handle vendor status errors
+        if (response.status === 403 && data?.status) {
+          throw new ApiError(
+            data.message || `Account is ${data.status}`,
+            response.status,
+            data.data || data
+          )
+        }
         throw new ApiError(
-          data.message || data || `HTTP error! status: ${response.status}`,
+          data?.message || `HTTP error! status: ${response.status}`,
           response.status,
           data
         )
@@ -89,7 +93,10 @@ export const api = {
       method: 'POST',
       body: formData,
       credentials: 'include',
-      // Don't set Content-Type for FormData, browser will set it with boundary
+      headers: {
+        'X-User-Type': 'vendor',
+        ...options.headers
+      }
     }
 
     const response = await fetch(url, config)
@@ -98,7 +105,8 @@ export const api = {
     if (!response.ok) {
       throw new ApiError(
         data.message || `HTTP error! status: ${response.status}`,
-        response.status
+        response.status,
+        data
       )
     }
 

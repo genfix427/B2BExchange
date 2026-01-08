@@ -26,48 +26,48 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 import LoadingSpinner from './components/common/LoadingSpinner'
 
 const App = () => {
-  const dispatch = useDispatch()
-  const { isAuthenticated, isLoading, user } = useSelector((state) => state.auth)
+  // const dispatch = useDispatch()
+  // const { isAuthenticated, isLoading, user } = useSelector((state) => state.auth)
 
-  // 🔹 Run auth check ONCE
-  useEffect(() => {
-    const hasSessionUser = sessionStorage.getItem('userData')
+  // // 🔹 Run auth check ONCE
+  // useEffect(() => {
+  //   const hasSessionUser = sessionStorage.getItem('userData')
 
-    if (hasSessionUser) {
-      dispatch(getCurrentUser())
-    }
-  }, [dispatch])
+  //   if (hasSessionUser) {
+  //     dispatch(getCurrentUser())
+  //   }
+  // }, [dispatch])
 
 
   // 🔹 Immediate redirect for suspended/rejected users
-  useEffect(() => {
-    const statusInfo = localStorage.getItem('vendorStatusInfo')
-    if (!statusInfo) return
+  // useEffect(() => {
+  //   const statusInfo = localStorage.getItem('vendorStatusInfo')
+  //   if (!statusInfo) return
 
-    try {
-      const { status } = JSON.parse(statusInfo)
-      localStorage.removeItem('vendorStatusInfo')
+  //   try {
+  //     const { status } = JSON.parse(statusInfo)
+  //     localStorage.removeItem('vendorStatusInfo')
 
-      if (status === 'rejected') {
-        window.location.replace('/account-rejected')
-      } else if (status === 'suspended') {
-        window.location.replace('/account-suspended')
-      } else if (status === 'pending') {
-        window.location.replace('/pending-approval')
-      }
-    } catch {
-      localStorage.removeItem('vendorStatusInfo')
-    }
-  }, [])
+  //     if (status === 'rejected') {
+  //       window.location.replace('/account-rejected')
+  //     } else if (status === 'suspended') {
+  //       window.location.replace('/account-suspended')
+  //     } else if (status === 'pending') {
+  //       window.location.replace('/pending-approval')
+  //     }
+  //   } catch {
+  //     localStorage.removeItem('vendorStatusInfo')
+  //   }
+  // }, [])
 
   // 🔹 Global loader
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <LoadingSpinner size="lg" />
-      </div>
-    )
-  }
+  // if (isLoading) {
+  //   return (
+  //     <div className="min-h-screen flex items-center justify-center bg-gray-50">
+  //       <LoadingSpinner size="lg" />
+  //     </div>
+  //   )
+  // }
 
   return (
     <Router>

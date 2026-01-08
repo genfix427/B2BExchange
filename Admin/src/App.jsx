@@ -1,40 +1,45 @@
-import React, { useEffect } from 'react'
+// import React, { useEffect } from 'react'
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { useDispatch, useSelector } from 'react-redux'
+// import { useDispatch } from 'react-redux'
+// import { getCurrentAdmin } from './store/slices/adminAuthSlice'
+
+// Layout Components
 import DashboardLayout from './components/layout/DashboardLayout'
-import ProtectedRoute from './components/auth/ProtectedRoute'
 
 // Pages
 import AdminLoginPage from './pages/auth/AdminLoginPage'
 import AdminDashboardPage from './pages/dashboard/AdminDashboardPage'
 import VendorApprovalPage from './pages/dashboard/VendorApprovalPage'
 import VendorManagementPage from './pages/dashboard/VendorManagementPage'
-import NotFoundPage from './pages/NotFoundPage'
 import VendorDetailPage from './pages/dashboard/VendorDetailPage'
 import AnalyticsPage from './pages/analytics/AnalyticsPage'
 import AdminSettingsPage from './pages/settings/AdminSettingsPage'
+import NotFoundPage from './pages/NotFoundPage'
+
+// Components
+import AdminProtectedRoute from './components/auth/ProtectedRoute'
 
 const App = () => {
-  const { isAuthenticated } = useSelector((state) => state.auth)
+  // const dispatch = useDispatch()
 
-  // Remove auto-fetch of current user on app load
-  // Let ProtectedRoute handle it
+  // // Initialize admin authentication on app load
+  // useEffect(() => {
+  //   dispatch(getCurrentAdmin())
+  // }, [dispatch])
 
   return (
     <Router>
       <Routes>
-        {/* Public routes */}
-        <Route path="/admin/login" element={
-          isAuthenticated ? <Navigate to="/admin/dashboard" replace /> : <AdminLoginPage />
-        } />
+        {/* Public Admin Login */}
+        <Route path="/admin/login" element={<AdminLoginPage />} />
 
         {/* Protected Admin Routes */}
         <Route
           path="/admin"
           element={
-            <ProtectedRoute>
+            <AdminProtectedRoute>
               <DashboardLayout />
-            </ProtectedRoute>
+            </AdminProtectedRoute>
           }
         >
           <Route index element={<Navigate to="dashboard" replace />} />
@@ -46,10 +51,10 @@ const App = () => {
           <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
 
-        {/* Root redirect */}
+        {/* Root redirect to admin login */}
         <Route path="/" element={<Navigate to="/admin/login" replace />} />
 
-        {/* 404 */}
+        {/* Admin 404 */}
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Router>

@@ -2,17 +2,17 @@ import { configureStore } from '@reduxjs/toolkit'
 import { persistStore, persistReducer } from 'redux-persist'
 import storage from 'redux-persist/lib/storage'
 import { combineReducers } from 'redux'
-import authReducer from './slices/authSlice'
+import adminAuthReducer from './slices/adminAuthSlice'
 import vendorReducer from './slices/vendorSlice'
 
 const persistConfig = {
   key: 'adminRoot',
   storage,
-  whitelist: ['auth']
+  whitelist: ['adminAuth'] // Only persist auth state
 }
 
 const rootReducer = combineReducers({
-  auth: authReducer,
+  adminAuth: adminAuthReducer,
   vendors: vendorReducer
 })
 

@@ -1,111 +1,161 @@
 import { api } from './api'
+import { cookieHelper } from '../utils/cookieHelper'
 
 export const authService = {
   async login(email, password) {
     try {
-      console.log('Attempting login for:', email) // Debug
+      console.log('Attempting admin login...')
       
-      const response = await api.post('/auth/admin/login', { email, password })
+      // Clear any existing cookies first
+      cookieHelper.clearAllAuthCookies()
       
-      console.log('Login response:', response) // Debug
+      const response = await api.post('/admin/auth/login', { email, password })
       
-      if (response.success && response.data) {
-        // Store token from response
-        const token = response.data.token || response.data.accessToken
+      console.log('Admin login response:', {
+        success: response.success,
+        cookies: document.cookie
+      })
+      
+      if (response.success) {
+        // Store admin info in localStorage
+        localStorage.setItem('adminToken', 'true')
+        localStorage.setItem('adminUser', JSON.stringify(response.data))
+        localStorage.setItem('adminLastLogin', new Date().toISOString())
+        localStorage.setItem('adminPermissions', JSON.stringify(response.data.permissions || {}))
         
-        if (token) {
-          localStorage.setItem('adminToken', token)
-          localStorage.setItem('adminUserType', 'admin')
-          localStorage.setItem('adminEmail', email)
-          
-          // Store user data if available
-          if (response.data.user) {
-            localStorage.setItem('adminUser', JSON.stringify(response.data.user))
-          }
-          
-          console.log('Login successful, token stored') // Debug
-        } else {
-          console.warn('No token in response') // Debug
+        // Check if cookie was set
+        if (!cookieHelper.hasAdminToken()) {
+          console.warn('Admin token cookie not set after login')
         }
-      } else {
-        console.warn('Login response not successful:', response) // Debug
       }
       
       return response.data
     } catch (error) {
-      console.error('Login error:', error) // Debug
+      console.error('Admin login error:', error)
       throw error
     }
   },
 
   async logout() {
     try {
-      // Clear all admin-related storage first
-      localStorage.removeItem('adminToken')
-      localStorage.removeItem('token')
-      localStorage.removeItem('adminUserType')
-      localStorage.removeItem('adminEmail')
-      localStorage.removeItem('adminUser')
-      
-      console.log('LocalStorage cleared') // Debug
-      
-      // Then call logout API
-      await api.post('/auth/logout')
+      console.log('Attempting admin logout...')
+      await api.post('/admin/auth/logout')
+      console.log('Admin logout successful')
     } catch (error) {
-      console.error('Logout error:', error)
+      console.error('Admin logout API error:', error)
+    } finally {
+      this.clearAdminStorage()
     }
   },
 
-  async getCurrentUser() {
+  async getCurrentAdmin() {
     try {
-      const response = await api.get('/auth/me')
-      console.log('Current user response:', response) // Debug
-      return response.data
+      console.log('Getting current admin, cookies:', document.cookie)
+      
+      // Check if we have an admin token cookie
+      if (!cookieHelper.hasAdminToken()) {
+        console.log('No admin_token cookie found, clearing storage')
+        this.clearAdminStorage()
+        throw new Error('No authentication token found')
+      }
+
+      const response = await api.get('/admin/auth/me')
+      
+      console.log('Get current admin response:', {
+        success: response.success,
+        hasData: !!response.data,
+        cookies: document.cookie
+      })
+
+      if (response.success) {
+        // Update localStorage
+        localStorage.setItem('adminUser', JSON.stringify(response.data))
+        localStorage.setItem('adminPermissions', JSON.stringify(response.data.permissions || {}))
+        return response.data
+      }
+      throw new Error('Failed to get current admin')
     } catch (error) {
-      console.error('Get current user error:', error) // Debug
+      console.error('Get current admin error:', {
+        statusCode: error.statusCode,
+        message: error.message,
+        cookies: document.cookie
+      })
+      
+      // If unauthorized, clear storage
+      if (error.statusCode === 401 || error.message.includes('No authentication')) {
+        this.clearAdminStorage()
+      }
       throw error
     }
-  },
-
-  isAuthenticated() {
-    const token = localStorage.getItem('adminToken')
-    const isValid = !!token
-    console.log('Auth check - Token valid:', isValid) // Debug
-    return isValid
-  },
-
-  getToken() {
-    return localStorage.getItem('adminToken')
-  },
-
-  async logout() {
-    await api.post('/auth/logout')
-    localStorage.clear()
-  },
-
-  async getCurrentUser() {
-    const response = await api.get('/auth/me')
-    return response.data
   },
 
   async forgotPassword(email) {
-    const response = await api.post('/auth/forgot-password', { email, userType: 'Admin' })
+    const response = await api.post('/admin/auth/forgot-password', { email })
     return response
   },
 
   async resetPassword(token, password) {
-    const response = await api.post(`/auth/reset-password/${token}`, { 
-      password, 
-      userType: 'Admin' 
-    })
+    const response = await api.post(`/admin/auth/reset-password/${token}`, { password })
     return response
   },
 
-  isAuthenticated() {
-    return !!localStorage.getItem('adminUserType')
+  // Helper methods
+  clearAdminStorage() {
+    console.log('Clearing admin storage...')
+    localStorage.removeItem('adminToken')
+    localStorage.removeItem('adminUser')
+    localStorage.removeItem('adminLastLogin')
+    localStorage.removeItem('adminPermissions')
+    // Clear admin cookies
+    cookieHelper.clearAdminToken()
+    console.log('Admin storage cleared')
   },
 
-  getUserType() {
-    return localStorage.getItem('adminUserType')
+  getStoredAdmin() {
+    try {
+      const adminData = localStorage.getItem('adminUser')
+      return adminData ? JSON.parse(adminData) : null
+    } catch (error) {
+      console.error('Error parsing stored admin data:', error)
+      return null
+    }
+  },
+
+  isAdminAuthenticated() {
+    // Check both localStorage and cookies
+    const adminData = this.getStoredAdmin()
+    const hasLocalToken = !!localStorage.getItem('adminToken')
+    const hasCookieToken = cookieHelper.hasAdminToken()
+    
+    console.log('Auth check:', {
+      hasAdminData: !!adminData,
+      hasLocalToken,
+      hasCookieToken
+    })
+    
+    return !!adminData && hasLocalToken && hasCookieToken
+  },
+
+  getAdminPermissions() {
+    try {
+      const permissions = localStorage.getItem('adminPermissions')
+      return permissions ? JSON.parse(permissions) : {}
+    } catch (error) {
+      return {}
+    }
+  },
+
+  hasPermission(permission) {
+    const permissions = this.getAdminPermissions()
+    return permissions[permission] === true
+  },
+
+  // Check if we have valid cookies
+  checkCookies() {
+    return {
+      hasAdminToken: cookieHelper.hasAdminToken(),
+      adminToken: cookieHelper.getAdminToken(),
+      allCookies: document.cookie
+    }
   }
 }

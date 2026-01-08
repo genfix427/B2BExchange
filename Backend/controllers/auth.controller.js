@@ -1,12 +1,11 @@
 import Vendor from '../models/Vendor.model.js';
-import Admin from '../models/Admin.model.js';
 import Token from '../models/Token.model.js';
-import { generateToken, setTokenCookie, clearTokenCookie } from '../utils/helpers.js';
+import { generateToken, setVendorTokenCookie, clearVendorTokenCookie } from '../utils/vendorHelpers.js';
 import { sendPasswordResetEmail } from '../services/email.service.js';
 import crypto from 'crypto';
 
 // @desc    Vendor login
-// @route   POST /api/auth/vendor/login
+// @route   POST /api/vendor/auth/login
 // @access  Public
 export const vendorLogin = async (req, res, next) => {
   try {
@@ -40,35 +39,13 @@ export const vendorLogin = async (req, res, next) => {
       });
     }
 
-    // Check vendor status and return appropriate response
+    // Check vendor status
     if (vendor.status !== 'approved') {
-      let message = '';
-      let redirectTo = '';
-      
-      switch (vendor.status) {
-        case 'pending':
-          message = 'Account pending admin approval';
-          redirectTo = '/pending-approval';
-          break;
-        case 'rejected':
-          message = 'Account has been rejected';
-          redirectTo = '/account-rejected';
-          break;
-        case 'suspended':
-          message = 'Account has been suspended';
-          redirectTo = '/account-suspended';
-          break;
-        default:
-          message = 'Account not approved';
-          redirectTo = '/pending-approval';
-      }
-
       return res.status(403).json({
         success: false,
-        message,
-        data: {
+        message: `Account is ${vendor.status}`,
+        data: { 
           status: vendor.status,
-          redirectTo,
           id: vendor._id,
           email: vendor.email,
           rejectionReason: vendor.rejectionReason,
@@ -81,16 +58,16 @@ export const vendorLogin = async (req, res, next) => {
     vendor.lastLoginAt = new Date();
     await vendor.save();
 
-    // Generate token
+    // Generate vendor token
     const token = generateToken(vendor._id, 'vendor');
 
-    // Set cookie
-    setTokenCookie(res, token);
+    // Set vendor-specific cookie
+    setVendorTokenCookie(res, token);
 
     // Return response
     res.status(200).json({
       success: true,
-      message: 'Login successful',
+      message: 'Vendor login successful',
       data: {
         id: vendor._id,
         email: vendor.email,
@@ -98,7 +75,8 @@ export const vendorLogin = async (req, res, next) => {
         status: vendor.status,
         profileCompleted: vendor.profileCompleted,
         pharmacyInfo: vendor.pharmacyInfo,
-        pharmacyOwner: vendor.pharmacyOwner
+        pharmacyOwner: vendor.pharmacyOwner,
+        lastLoginAt: vendor.lastLoginAt
       }
     });
 
@@ -108,165 +86,86 @@ export const vendorLogin = async (req, res, next) => {
   }
 };
 
-// @desc    Admin login
-// @route   POST /api/auth/admin/login
-// @access  Public
-export const adminLogin = async (req, res, next) => {
+// @desc    Vendor logout
+// @route   POST /api/vendor/auth/logout
+// @access  Private (Vendor)
+export const vendorLogout = async (req, res, next) => {
   try {
-    const { email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Please provide email and password'
-      });
-    }
-
-    // Find admin with password selected
-    const admin = await Admin.findOne({ email, isActive: true }).select('+password');
+    clearVendorTokenCookie(res);
     
-    if (!admin) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    // Check password
-    const isPasswordValid = await admin.comparePassword(password);
-    
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid email or password'
-      });
-    }
-
-    // Update last login
-    admin.lastLoginAt = new Date();
-    await admin.save();
-
-    // Generate token
-    const token = generateToken(admin._id, admin.role);
-
-    // Set cookie
-    setTokenCookie(res, token);
-
-    // Return response
     res.status(200).json({
       success: true,
-      message: 'Login successful',
-      data: {
-        id: admin._id,
-        email: admin.email,
-        role: admin.role,
-        firstName: admin.firstName,
-        lastName: admin.lastName,
-        permissions: admin.permissions
-      }
+      message: 'Vendor logged out successfully'
     });
-
   } catch (error) {
-    console.error('Admin login error:', error);
+    console.error('Vendor logout error:', error);
     next(error);
   }
 };
 
-// @desc    Get current user
-// @route   GET /api/auth/me
-// @access  Private
-export const getCurrentUser = async (req, res, next) => {
+// @desc    Get current vendor
+// @route   GET /api/vendor/auth/me
+// @access  Private (Vendor)
+export const getCurrentVendor = async (req, res, next) => {
   try {
-    if (!req.user) {
+    if (!req.vendor) {
       return res.status(401).json({
         success: false,
         message: 'Not authenticated'
       });
     }
 
-    let userData;
-    
-    if (req.user.role === 'vendor') {
-      // Populate vendor data
-      const vendor = await Vendor.findById(req.user._id)
-        .select('-password')
-        .populate('approvedBy', 'firstName lastName email');
-      
-      if (!vendor) {
-        return res.status(404).json({
-          success: false,
-          message: 'Vendor not found'
-        });
-      }
+    const vendor = await Vendor.findById(req.vendor._id)
+      .select('-password')
+      .populate('approvedBy', 'firstName lastName email');
 
-      userData = {
-        id: vendor._id,
-        email: vendor.email,
-        role: 'vendor',
-        status: vendor.status,
-        profileCompleted: vendor.profileCompleted || false,
-        registeredAt: vendor.registeredAt,
-        lastLoginAt: vendor.lastLoginAt,
-        // Vendor specific data
-        pharmacyInfo: vendor.pharmacyInfo,
-        pharmacyOwner: vendor.pharmacyOwner,
-        primaryContact: vendor.primaryContact,
-        pharmacyLicense: vendor.pharmacyLicense,
-        pharmacyQuestions: vendor.pharmacyQuestions,
-        referralInfo: vendor.referralInfo,
-        documents: vendor.documents,
-        approvedBy: vendor.approvedBy,
-        approvedAt: vendor.approvedAt,
-        rejectionReason: vendor.rejectionReason
-      };
-    } else {
-      // Admin data
-      userData = {
-        id: req.user._id,
-        email: req.user.email,
-        role: req.user.role,
-        firstName: req.user.firstName,
-        lastName: req.user.lastName,
-        isActive: req.user.isActive,
-        permissions: req.user.permissions,
-        lastLoginAt: req.user.lastLoginAt
-      };
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
     }
 
+    const vendorData = {
+      id: vendor._id,
+      email: vendor.email,
+      role: 'vendor',
+      status: vendor.status,
+      profileCompleted: vendor.profileCompleted || false,
+      registeredAt: vendor.registeredAt,
+      lastLoginAt: vendor.lastLoginAt,
+      // Vendor specific data
+      pharmacyInfo: vendor.pharmacyInfo,
+      pharmacyOwner: vendor.pharmacyOwner,
+      primaryContact: vendor.primaryContact,
+      pharmacyLicense: vendor.pharmacyLicense,
+      pharmacyQuestions: vendor.pharmacyQuestions,
+      referralInfo: vendor.referralInfo,
+      documents: vendor.documents,
+      approvedBy: vendor.approvedBy,
+      approvedAt: vendor.approvedAt,
+      rejectionReason: vendor.rejectionReason,
+      suspensionReason: vendor.suspensionReason,
+      suspendedAt: vendor.suspendedAt
+    };
+
     res.status(200).json({
       success: true,
-      data: userData
+      data: vendorData
     });
 
   } catch (error) {
-    console.error('Get current user error:', error);
+    console.error('Get current vendor error:', error);
     next(error);
   }
 };
 
-// @desc    Logout
-// @route   POST /api/auth/logout
-// @access  Private
-export const logout = async (req, res, next) => {
-  try {
-    clearTokenCookie(res);
-    
-    res.status(200).json({
-      success: true,
-      message: 'Logged out successfully'
-    });
-  } catch (error) {
-    console.error('Logout error:', error);
-    next(error);
-  }
-};
-
-// @desc    Forgot password
-// @route   POST /api/auth/forgot-password
+// @desc    Vendor forgot password
+// @route   POST /api/vendor/auth/forgot-password
 // @access  Public
-export const forgotPassword = async (req, res, next) => {
+export const vendorForgotPassword = async (req, res, next) => {
   try {
-    const { email, userType = 'Vendor' } = req.body;
+    const { email } = req.body;
 
     if (!email) {
       return res.status(400).json({
@@ -275,16 +174,10 @@ export const forgotPassword = async (req, res, next) => {
       });
     }
 
-    // Find user based on type
-    let user;
-    if (userType === 'Vendor') {
-      user = await Vendor.findOne({ email, status: 'approved' });
-    } else {
-      user = await Admin.findOne({ email, isActive: true });
-    }
+    const vendor = await Vendor.findOne({ email, status: 'approved' });
 
-    if (!user) {
-      // Still return success for security (don't reveal if email exists)
+    if (!vendor) {
+      // Still return success for security
       return res.status(200).json({
         success: true,
         message: 'If the email exists, a reset link will be sent'
@@ -293,8 +186,8 @@ export const forgotPassword = async (req, res, next) => {
 
     // Delete any existing reset tokens
     await Token.deleteMany({
-      userId: user._id,
-      userType,
+      userId: vendor._id,
+      userType: 'Vendor',
       type: 'password_reset'
     });
 
@@ -304,14 +197,14 @@ export const forgotPassword = async (req, res, next) => {
 
     // Save token to database
     await Token.create({
-      userId: user._id,
-      userType,
+      userId: vendor._id,
+      userType: 'Vendor',
       token: hashedToken,
       type: 'password_reset',
       expiresAt: new Date(Date.now() + 3600000) // 1 hour
     });
 
-    // Send email
+    // Send vendor-specific reset email
     await sendPasswordResetEmail(email, resetToken);
 
     res.status(200).json({
@@ -320,18 +213,18 @@ export const forgotPassword = async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Forgot password error:', error);
+    console.error('Vendor forgot password error:', error);
     next(error);
   }
 };
 
-// @desc    Reset password
-// @route   POST /api/auth/reset-password/:token
+// @desc    Vendor reset password
+// @route   POST /api/vendor/auth/reset-password/:token
 // @access  Public
-export const resetPassword = async (req, res, next) => {
+export const vendorResetPassword = async (req, res, next) => {
   try {
     const { token } = req.params;
-    const { password, userType = 'Vendor' } = req.body;
+    const { password } = req.body;
 
     if (!password || password.length < 8) {
       return res.status(400).json({
@@ -346,7 +239,7 @@ export const resetPassword = async (req, res, next) => {
     // Find valid token
     const passwordResetToken = await Token.findOne({
       token: hashedToken,
-      userType,
+      userType: 'Vendor',
       type: 'password_reset',
       expiresAt: { $gt: new Date() },
       used: false
@@ -359,33 +252,27 @@ export const resetPassword = async (req, res, next) => {
       });
     }
 
-    // Find user
-    let user;
-    if (userType === 'Vendor') {
-      user = await Vendor.findById(passwordResetToken.userId);
-    } else {
-      user = await Admin.findById(passwordResetToken.userId);
-    }
+    const vendor = await Vendor.findById(passwordResetToken.userId);
 
-    if (!user) {
+    if (!vendor) {
       return res.status(404).json({
         success: false,
-        message: 'User not found'
+        message: 'Vendor not found'
       });
     }
 
     // Update password
-    user.password = password;
-    await user.save();
+    vendor.password = password;
+    await vendor.save();
 
     // Mark token as used
     passwordResetToken.used = true;
     await passwordResetToken.save();
 
-    // Delete all reset tokens for this user
+    // Delete all reset tokens for this vendor
     await Token.deleteMany({
-      userId: user._id,
-      userType,
+      userId: vendor._id,
+      userType: 'Vendor',
       type: 'password_reset'
     });
 
@@ -395,7 +282,39 @@ export const resetPassword = async (req, res, next) => {
     });
 
   } catch (error) {
-    console.error('Reset password error:', error);
+    console.error('Vendor reset password error:', error);
+    next(error);
+  }
+};
+
+// @desc    Update vendor profile
+// @route   PUT /api/vendor/auth/profile
+// @access  Private (Vendor)
+export const updateVendorProfile = async (req, res, next) => {
+  try {
+    const vendorId = req.vendor._id;
+    const updateData = req.body;
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      vendorId,
+      { $set: updateData },
+      { new: true, runValidators: true }
+    ).select('-password');
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: vendor
+    });
+  } catch (error) {
+    console.error('Update vendor profile error:', error);
     next(error);
   }
 };

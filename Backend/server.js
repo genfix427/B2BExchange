@@ -19,6 +19,7 @@ import authRoutes from './routes/auth.routes.js';
 import vendorRoutes from './routes/vendor.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+import adminAuthRoutes from './routes/adminAuth.routes.js';
 
 // Import middleware
 import errorHandler from './middleware/error.middleware.js';
@@ -34,12 +35,11 @@ const app = express();
 const corsOptions = {
   origin: (origin, callback) => {
     const allowedOrigins = [
-      'http://localhost:5173', // Vite
-      'http://localhost:5174', // Admin
+      'http://localhost:5173',
+      'http://localhost:5174',
       process.env.CLIENT_URL,
     ].filter(Boolean);
 
-    // Allow Postman / curl / mobile apps
     if (!origin) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -50,10 +50,15 @@ const corsOptions = {
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  allowedHeaders: [
+    'Content-Type',
+    'Authorization',
+    'x-user-type',
+  ],
 };
 
 app.use(cors(corsOptions));
+
 
 /* =========================
    BODY PARSERS
@@ -85,8 +90,10 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-app.use('/api/auth', authLimiter);
+// app.use('/api/auth', authLimiter);
+app.use('/api/vendor/auth', authRoutes);
 app.use('/api/admin', authLimiter);
+app.use('/api/admin/auth', adminAuthRoutes);
 
 /* =========================
    STATIC FILES

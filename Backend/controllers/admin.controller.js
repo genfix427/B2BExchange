@@ -548,11 +548,14 @@ export const reactivateVendor = async (req, res, next) => {
 // @desc    Get all vendors
 // @route   GET /api/admin/vendors
 // @access  Private (Admin)
+// In admin.controller.js - Update getAllVendors function
 export const getAllVendors = async (req, res, next) => {
   try {
-    console.log('Admin ID making request:', req.admin?._id)
-    console.log('Admin email:', req.admin?.email)
-    console.log('Admin permissions:', req.admin?.permissions)
+    console.log('📊 Admin fetching all vendors:', {
+      adminId: req.admin?._id,
+      email: req.admin?.email,
+      query: req.query
+    })
     
     const { 
       status, 
@@ -579,20 +582,33 @@ export const getAllVendors = async (req, res, next) => {
       ];
     }
     
-    console.log('Query for vendors:', query)
+    console.log('🔍 Query for vendors:', query)
     
     const skip = (parseInt(page) - 1) * parseInt(limit);
     const sort = {};
     sort[sortBy] = sortOrder === 'asc' ? 1 : -1;
     
+    // Ensure documents field is included
     const vendors = await Vendor.find(query)
-      .select('pharmacyInfo pharmacyOwner email status registeredAt approvedAt')
+      .select('pharmacyInfo pharmacyOwner email status registeredAt approvedAt documents') // Add documents here
       .populate('approvedBy', 'firstName lastName')
       .sort(sort)
       .skip(skip)
       .limit(parseInt(limit));
     
-    console.log(`Found ${vendors.length} vendors`)
+    console.log(`✅ Found ${vendors.length} vendors`)
+    
+    // Log first vendor's document count
+    if (vendors.length > 0) {
+      vendors.forEach((vendor, index) => {
+        console.log(`📄 Vendor ${index + 1} (${vendor._id}):`, {
+          businessName: vendor.pharmacyInfo?.legalBusinessName,
+          hasDocumentsField: 'documents' in vendor,
+          documentsCount: vendor.documents?.length || 0,
+          documents: vendor.documents ? 'Has documents array' : 'No documents'
+        })
+      })
+    }
     
     const total = await Vendor.countDocuments(query);
     
@@ -607,7 +623,7 @@ export const getAllVendors = async (req, res, next) => {
       }
     });
   } catch (error) {
-    console.error('Error in getAllVendors:', error)
+    console.error('❌ Error in getAllVendors:', error)
     next(error);
   }
 };

@@ -9,22 +9,25 @@ export const login = createAsyncThunk(
       const data = await authService.login(email, password)
       return data
     } catch (error) {
-      // Handle vendor status errors (403)
       if (error instanceof ApiError && error.statusCode === 403) {
-        // Return the status info for redirect
         return rejectWithValue({
-          message: error.message,
-          data: error.data,
-          isStatusError: true
+          isStatusError: true,
+          status: error.data?.data?.status, // ✅ FIX
+          rejectionReason: error.data?.data?.rejectionReason,
+          suspensionReason: error.data?.data?.suspensionReason,
+          message: error.message
         })
       }
+
       return rejectWithValue({
-        message: error.message || 'Login failed',
-        isStatusError: false
+        isStatusError: false,
+        message: error.message || 'Login failed'
       })
     }
   }
 )
+
+
 
 export const logout = createAsyncThunk(
   'auth/logout',
@@ -134,13 +137,19 @@ const authSlice = createSlice({
       })
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
+
+        // ⛔ DO NOT reset auth for status-based rejections
+        if (action.payload?.isStatusError) {
+          state.error = null
+          return
+        }
+
+        // Normal login error
         state.isAuthenticated = false
         state.user = null
-        state.userType = null
-        state.error = action.payload?.isStatusError
-          ? null
-          : action.payload?.message
+        state.error = action.payload?.message
       })
+
 
       // Logout
       .addCase(logout.pending, (state) => {

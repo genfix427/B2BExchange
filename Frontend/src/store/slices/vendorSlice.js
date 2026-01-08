@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import * as vendorService from '../../services/vendor.service'
+import {vendorService} from '../../services/vendor.service'
 
 export const fetchVendorProfile = createAsyncThunk(
   'vendor/fetchProfile',

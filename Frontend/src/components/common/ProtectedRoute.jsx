@@ -1,63 +1,54 @@
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
+import LoadingSpinner from '../common/LoadingSpinner' // adjust path if needed
 
 const ProtectedRoute = ({ children }) => {
   const location = useLocation()
-  const { isAuthenticated, isLoading, user } = useSelector((state) => state.auth)
+  const { isAuthenticated, isLoading, user } = useSelector(
+    (state) => state.auth
+  )
 
+  // ✅ Only block THIS route, not the whole app
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        <LoadingSpinner size="md" />
       </div>
     )
   }
 
-  let redirectPath = null
-
-  // 🔹 Handle status-based redirects safely
-  const statusInfo = localStorage.getItem('vendorStatusInfo')
-  if (statusInfo) {
-    try {
-      const parsed = JSON.parse(statusInfo)
-
-      if (parsed?.status === 'rejected') {
-        redirectPath = '/account-rejected'
-      } else if (parsed?.status === 'suspended') {
-        redirectPath = '/account-suspended'
-      } else if (parsed?.status === 'pending') {
-        redirectPath = '/pending-approval'
-      }
-    } catch {
-      localStorage.removeItem('vendorStatusInfo')
-    }
-  }
-
-  if (redirectPath) {
-    return <Navigate to={redirectPath} replace />
-  }
-
-  // 🔹 Auth check
+  // ❌ Not logged in
   if (!isAuthenticated || !user) {
     return (
       <Navigate
-        to={`/login?redirect=${encodeURIComponent(location.pathname)}`}
+        to="/login"
+        state={{ from: location }}
         replace
       />
     )
   }
 
-  // 🔹 Role check
+  // ❌ Wrong role
   if (user.role !== 'vendor') {
     return <Navigate to="/login" replace />
   }
 
-  // 🔹 Approval check
+  // ❌ Vendor exists but not approved
   if (user.status !== 'approved') {
-    return <Navigate to="/pending-approval" replace />
+    switch (user.status) {
+      case 'pending':
+        return <Navigate to="/pending-approval" replace />
+      case 'rejected':
+        return <Navigate to="/account-rejected" replace />
+      case 'suspended':
+        return <Navigate to="/account-suspended" replace />
+      default:
+        return <Navigate to="/login" replace />
+    }
   }
 
+  // ✅ Approved vendor → allow access
   return children
 }
 

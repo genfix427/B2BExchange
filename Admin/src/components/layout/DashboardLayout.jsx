@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { useDispatch } from 'react-redux'
-import { logout } from '../../store/slices/authSlice'
+import { useDispatch, useSelector } from 'react-redux'
+import { adminLogout } from '../../store/slices/adminAuthSlice'
 import {
   LayoutDashboard,
   Users,
@@ -21,9 +21,12 @@ const DashboardLayout = () => {
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const dispatch = useDispatch()
   const location = useLocation()
+  
+  // Access adminAuth state
+  const { admin } = useSelector((state) => state.adminAuth)
 
   const handleLogout = () => {
-    dispatch(logout())
+    dispatch(adminLogout())
   }
 
   const navigation = [
@@ -136,7 +139,9 @@ const DashboardLayout = () => {
                     <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
                       <User className="h-5 w-5 text-blue-600" />
                     </div>
-                    <span className="ml-2 text-gray-700 hidden md:block">Admin</span>
+                    <span className="ml-2 text-gray-700 hidden md:block">
+                      {admin?.firstName || 'Admin'}
+                    </span>
                     <ChevronDown className="ml-1 h-4 w-4 text-gray-400" />
                   </button>
                 </div>

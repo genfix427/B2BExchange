@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { login, clearError } from '../../store/slices/authSlice'
 import { Building2 } from 'lucide-react'
+import { clearAuth } from '../../store/slices/authSlice'
 
 const LoginPage = () => {
   const dispatch = useDispatch()
@@ -95,43 +96,44 @@ const LoginPage = () => {
   }
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
+  e.preventDefault()
+  if (!validateForm()) return
 
-    if (!validateForm()) return
+  try {
+    await dispatch(login(formData)).unwrap()
+    // Approved users handled by useEffect
+  } catch (err) {
+  if (err?.isStatusError) {
+    dispatch(clearAuth()) // ⛔ stop auth guards
 
-    try {
-      await dispatch(
-        login({
-          email: formData.email,
-          password: formData.password
-        })
-      ).unwrap()
-    } catch (err) {
-      if (err?.isStatusError) {
-        const status =
-          err?.data?.status || err?.status || err?.data?.data?.status
-
-        if (status === 'suspended') {
-          navigate('/account-suspended', { replace: true })
-          return
-        }
-
-        if (status === 'rejected') {
-          navigate('/account-rejected', { replace: true })
-          return
-        }
-
-        if (status === 'pending') {
-          navigate('/pending-approval', { replace: true })
-          return
-        }
-      }
-
-      // Only show error if NOT status-based
-      setApiError(err?.message || 'Login failed')
+    if (err.status === 'pending') {
+      navigate('/pending-approval', { replace: true })
+      return
     }
 
+    if (err.status === 'rejected') {
+      navigate('/account-rejected', {
+        replace: true,
+        state: { reason: err.rejectionReason }
+      })
+      return
+    }
+
+    if (err.status === 'suspended') {
+      navigate('/account-suspended', {
+        replace: true,
+        state: { reason: err.suspensionReason }
+      })
+      return
+    }
   }
+
+  setApiError(err?.message || 'Login failed')
+}
+
+}
+
+
 
 
 

@@ -41,9 +41,9 @@ const adminSchema = new mongoose.Schema({
       type: Boolean,
       default: true
     },
-    canManageAdmins: {
+    canManageVendors: {  // CHANGE FROM canManageAdmins TO canManageVendors
       type: Boolean,
-      default: false
+      default: true  // Set to true by default
     },
     canViewAnalytics: {
       type: Boolean,
@@ -56,6 +56,10 @@ const adminSchema = new mongoose.Schema({
     canSuspendVendors: {
       type: Boolean,
       default: true
+    },
+    canManageAdmins: {  // Add this for admin management
+      type: Boolean,
+      default: false
     }
   },
   phone: {

@@ -5,7 +5,8 @@ import {
   fetchPendingVendors,
   approveVendor,
   rejectVendor,
-  fetchVendors
+  clearError,
+  clearSuccess
 } from '../../store/slices/vendorSlice'
 import {
   Search,
@@ -22,15 +23,16 @@ import {
   Filter,
   ChevronDown,
   FileCheck,
-  UserCheck
+  UserCheck,
+  ShieldAlert
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 
 const VendorApprovalPage = () => {
   const dispatch = useDispatch()
   const navigate = useNavigate()
-  const { vendors, pagination, isLoading, error } = useSelector((state) => state.vendors)
-  
+  const { vendors, pagination, isLoading, error, success } = useSelector((state) => state.vendors)
+
   const [search, setSearch] = useState('')
   const [selectedVendor, setSelectedVendor] = useState(null)
   const [showRejectModal, setShowRejectModal] = useState(false)
@@ -39,6 +41,14 @@ const VendorApprovalPage = () => {
   const [statusFilter, setStatusFilter] = useState('pending')
   const [dateFilter, setDateFilter] = useState('all')
 
+  // Clear messages when component unmounts
+  useEffect(() => {
+    return () => {
+      dispatch(clearError())
+      dispatch(clearSuccess())
+    }
+  }, [dispatch])
+
   useEffect(() => {
     dispatch(fetchPendingVendors({ page: 1, limit: 10 }))
   }, [dispatch])
@@ -46,17 +56,19 @@ const VendorApprovalPage = () => {
   // Ensure vendors is always an array
   const vendorsArray = Array.isArray(vendors) ? vendors : []
 
-  const handleApprove = (vendorId, vendorName) => {
+  const handleApprove = async (vendorId, vendorName) => {
     if (window.confirm(`Are you sure you want to approve ${vendorName || 'this vendor'}?`)) {
-      dispatch(approveVendor(vendorId))
-        .then(() => {
-          alert('Vendor approved successfully!')
-          // Refresh the list
+      try {
+        await dispatch(approveVendor(vendorId)).unwrap()
+        // Show success message (handled by state)
+        // Refresh the list after 1.5 seconds
+        setTimeout(() => {
           dispatch(fetchPendingVendors({ page: 1, limit: 10 }))
-        })
-        .catch(error => {
-          alert(`Error: ${error.message}`)
-        })
+        }, 1500)
+      } catch (error) {
+        // Error is handled by the slice
+        console.error('Approval failed:', error)
+      }
     }
   }
 
@@ -65,24 +77,24 @@ const VendorApprovalPage = () => {
     setShowRejectModal(true)
   }
 
-  const confirmReject = () => {
+  const confirmReject = async () => {
     if (rejectionReason.trim().length < 10) {
       alert('Please provide a detailed rejection reason (minimum 10 characters)')
       return
     }
-    
-    dispatch(rejectVendor({ vendorId: selectedVendor, rejectionReason }))
-      .then(() => {
-        alert('Vendor rejected successfully!')
-        setShowRejectModal(false)
-        setRejectionReason('')
-        setSelectedVendor(null)
-        // Refresh the list
+
+    try {
+      await dispatch(rejectVendor({ vendorId: selectedVendor, rejectionReason })).unwrap()
+      setShowRejectModal(false)
+      setRejectionReason('')
+      setSelectedVendor(null)
+      // Refresh the list after 1.5 seconds
+      setTimeout(() => {
         dispatch(fetchPendingVendors({ page: 1, limit: 10 }))
-      })
-      .catch(error => {
-        alert(`Error: ${error.message}`)
-      })
+      }, 1500)
+    } catch (error) {
+      console.error('Rejection failed:', error)
+    }
   }
 
   const viewDetails = (vendorId) => {
@@ -95,32 +107,38 @@ const VendorApprovalPage = () => {
 
   const handleSearch = (e) => {
     e.preventDefault()
-    // You can implement search logic here or just filter the current list
+    // Implement search logic here
   }
 
+  // Filter vendors based on search and filters
   const filteredVendors = vendorsArray.filter(vendor => {
-    // Filter by search term
-    const searchLower = search.toLowerCase()
-    const matchesSearch = 
-      vendor.pharmacyInfo?.legalBusinessName?.toLowerCase().includes(searchLower) ||
-      vendor.pharmacyOwner?.email?.toLowerCase().includes(searchLower) ||
-      vendor.email?.toLowerCase().includes(searchLower) ||
-      vendor.pharmacyInfo?.npiNumber?.toLowerCase().includes(searchLower) ||
-      vendor.pharmacyLicense?.deaNumber?.toLowerCase().includes(searchLower) ||
-      false
+    if (!vendor) return false
 
-    // Filter by date
+    const searchLower = search.toLowerCase()
+    const businessName = vendor.pharmacyInfo?.legalBusinessName || ''
+    const ownerEmail = vendor.pharmacyOwner?.email || ''
+    const vendorEmail = vendor.email || ''
+    const npiNumber = vendor.pharmacyInfo?.npiNumber || ''
+    const deaNumber = vendor.pharmacyLicense?.deaNumber || ''
+
+    const matchesSearch =
+      businessName.toLowerCase().includes(searchLower) ||
+      ownerEmail.toLowerCase().includes(searchLower) ||
+      vendorEmail.toLowerCase().includes(searchLower) ||
+      npiNumber.toLowerCase().includes(searchLower) ||
+      deaNumber.toLowerCase().includes(searchLower)
+
     let matchesDate = true
     if (dateFilter !== 'all' && vendor.registeredAt) {
       const vendorDate = new Date(vendor.registeredAt)
       const today = new Date()
-      const sevenDaysAgo = new Date(today.setDate(today.getDate() - 7))
-      
-      switch(dateFilter) {
+
+      switch (dateFilter) {
         case 'today':
-          matchesDate = new Date(vendorDate.toDateString()) === new Date(new Date().toDateString())
+          matchesDate = vendorDate.toDateString() === today.toDateString()
           break
         case 'week':
+          const sevenDaysAgo = new Date(today.setDate(today.getDate() - 7))
           matchesDate = vendorDate >= sevenDaysAgo
           break
         case 'month':
@@ -132,45 +150,96 @@ const VendorApprovalPage = () => {
       }
     }
 
-    return matchesSearch && matchesDate
+    let matchesDocs = true
+    switch (statusFilter) {
+      case 'with_docs':
+        matchesDocs = vendor.documents && vendor.documents.length > 0
+        break
+      case 'no_docs':
+        matchesDocs = !vendor.documents || vendor.documents.length === 0
+        break
+      default:
+        matchesDocs = true
+    }
+
+    return matchesSearch && matchesDate && matchesDocs
   })
 
   // Calculate stats
   const stats = {
     totalPending: vendorsArray.length,
     today: vendorsArray.filter(v => {
+      if (!v) return false
       const today = new Date()
-      const vendorDate = new Date(v.registeredAt || v.createdAt)
-      return vendorDate.toDateString() === today.toDateString()
+      const vendorDate = v.registeredAt ? new Date(v.registeredAt) : null
+      return vendorDate && vendorDate.toDateString() === today.toDateString()
     }).length,
-    awaitingDocs: vendorsArray.filter(v => !v.documents || v.documents.length === 0).length,
-    withCompleteDocs: vendorsArray.filter(v => v.documents && v.documents.length >= 3).length
+    awaitingDocs: vendorsArray.filter(v => !v?.documents || v.documents.length === 0).length,
+    withCompleteDocs: vendorsArray.filter(v => v?.documents && v.documents.length >= 3).length
   }
 
   // Get vendor display info
   const getVendorDisplayInfo = (vendor) => {
+    if (!vendor) return {
+      name: 'Invalid Vendor',
+      email: 'N/A',
+      npi: 'N/A',
+      dea: 'N/A',
+      documentsCount: 0,
+      registeredDate: null,
+      contactName: 'N/A',
+      contactPhone: 'N/A'
+    }
+
     return {
-      name: vendor.pharmacyInfo?.legalBusinessName || 
-            vendor.pharmacyInfo?.name || 
-            'Unnamed Vendor',
-      email: vendor.pharmacyOwner?.email || 
-             vendor.email || 
-             'No email',
-      npi: vendor.pharmacyInfo?.npiNumber || 
-           'Not provided',
-      dea: vendor.pharmacyLicense?.deaNumber || 
-           'Not provided',
+      name: vendor.pharmacyInfo?.legalBusinessName ||
+        vendor.pharmacyInfo?.name ||
+        'Unnamed Vendor',
+      email: vendor.pharmacyOwner?.email ||
+        vendor.email ||
+        'No email',
+      npi: vendor.pharmacyInfo?.npiNumber ||
+        'Not provided',
+      dea: vendor.pharmacyLicense?.deaNumber ||
+        'Not provided',
       documentsCount: vendor.documents?.length || 0,
       registeredDate: vendor.registeredAt || vendor.createdAt,
       contactName: `${vendor.pharmacyOwner?.firstName || ''} ${vendor.pharmacyOwner?.lastName || ''}`.trim() || 'Unknown',
-      contactPhone: vendor.pharmacyOwner?.phone || 
-                   vendor.pharmacyOwner?.mobile || 
-                   'No phone'
+      contactPhone: vendor.pharmacyOwner?.phone ||
+        vendor.pharmacyOwner?.mobile ||
+        'No phone'
     }
   }
 
   return (
     <div className="space-y-6">
+      {/* Success/Error Messages */}
+      {success && (
+        <div className="rounded-md bg-green-50 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <CheckCircle className="h-5 w-5 text-green-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-green-800">{success}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-md bg-red-50 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <XCircle className="h-5 w-5 text-red-400" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-red-800">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -182,9 +251,10 @@ const VendorApprovalPage = () => {
         <div className="mt-4 sm:mt-0 flex space-x-3">
           <button
             onClick={refreshList}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            disabled={isLoading}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            <RefreshCw className="w-4 h-4 mr-2" />
+            <RefreshCw className={`w-4 h-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
           <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
@@ -286,7 +356,7 @@ const VendorApprovalPage = () => {
               />
             </div>
           </form>
-          
+
           <div className="flex items-center space-x-3">
             <button
               onClick={() => setShowFilters(!showFilters)}
@@ -317,7 +387,7 @@ const VendorApprovalPage = () => {
                   <option value="month">Last 30 days</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Documents Status
@@ -332,7 +402,7 @@ const VendorApprovalPage = () => {
                   <option value="no_docs">No documents</option>
                 </select>
               </div>
-              
+
               <div className="flex items-end">
                 <button
                   onClick={() => {
@@ -353,12 +423,13 @@ const VendorApprovalPage = () => {
       {/* Pending Vendors Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
         {isLoading ? (
-          <div className="flex justify-center items-center h-64">
+          <div className="flex flex-col justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="mt-4 text-gray-600">Loading vendors...</p>
           </div>
         ) : error ? (
           <div className="text-center py-12">
-            <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
+            <ShieldAlert className="mx-auto h-12 w-12 text-red-400" />
             <h3 className="mt-2 text-sm font-medium text-gray-900">Error loading vendors</h3>
             <p className="mt-1 text-sm text-gray-500">{error}</p>
             <button
@@ -393,8 +464,10 @@ const VendorApprovalPage = () => {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredVendors.map((vendor) => {
+                  if (!vendor) return null
+
                   const vendorInfo = getVendorDisplayInfo(vendor)
-                  
+
                   return (
                     <tr key={vendor._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4">
@@ -488,7 +561,7 @@ const VendorApprovalPage = () => {
                 })}
               </tbody>
             </table>
-            
+
             {/* Pagination */}
             {pagination && pagination.pages > 1 && (
               <div className="px-6 py-3 border-t border-gray-200">
@@ -502,14 +575,14 @@ const VendorApprovalPage = () => {
                   </div>
                   <div className="flex space-x-2">
                     <button
-                      onClick={() => dispatch(fetchPendingVendors({ page: pagination.page - 1, limit: 10 }))}
+                      onClick={() => dispatch(fetchPendingVendors({ page: pagination.page - 1, limit: pagination.limit }))}
                       disabled={pagination.page === 1}
                       className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Previous
                     </button>
                     <button
-                      onClick={() => dispatch(fetchPendingVendors({ page: pagination.page + 1, limit: 10 }))}
+                      onClick={() => dispatch(fetchPendingVendors({ page: pagination.page + 1, limit: pagination.limit }))}
                       disabled={pagination.page === pagination.pages}
                       className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed"
                     >

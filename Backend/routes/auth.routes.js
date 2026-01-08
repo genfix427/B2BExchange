@@ -1,25 +1,25 @@
 import express from 'express';
 import {
   vendorLogin,
-  adminLogin,
-  logout,
-  forgotPassword,
-  resetPassword,
-  getCurrentUser
+  vendorLogout,
+  getCurrentVendor,
+  vendorForgotPassword,
+  vendorResetPassword,
+  updateVendorProfile
 } from '../controllers/auth.controller.js';
 import { validateLogin } from '../middleware/validation.middleware.js';
-import { protect } from '../middleware/auth.middleware.js';
+import { vendorProtect } from '../middleware/auth.middleware.js';
 
 const router = express.Router();
 
-// Public routes
-router.post('/vendor/login', validateLogin, vendorLogin);
-router.post('/admin/login', validateLogin, adminLogin);
-router.post('/forgot-password', forgotPassword);
-router.post('/reset-password/:token', resetPassword);
+// Public vendor routes
+router.post('/login', validateLogin, vendorLogin);
+router.post('/forgot-password', vendorForgotPassword);
+router.post('/reset-password/:token', vendorResetPassword);
 
-// Protected routes - requires valid JWT token
-router.get('/me', protect, getCurrentUser); // ADD THIS LINE
-router.post('/logout', protect, logout);
+// Protected vendor routes
+router.get('/me', vendorProtect, getCurrentVendor);
+router.post('/logout', vendorProtect, vendorLogout);
+router.put('/profile', vendorProtect, updateVendorProfile);
 
 export default router;

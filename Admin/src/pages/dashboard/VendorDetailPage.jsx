@@ -6,9 +6,20 @@ import {
   approveVendor,
   rejectVendor,
   suspendVendor,
-  reactivateVendor
+  reactivateVendor,
+  downloadAllDocuments 
 } from '../../store/slices/vendorSlice'
-import { Upload } from 'lucide-react';
+import { 
+  Upload, 
+  Eye, 
+  Download,
+  FileDown,
+  FileText,
+  ExternalLink,
+  FileImage,
+  File,
+  X
+} from 'lucide-react';
 import {
   ArrowLeft,
   Building,
@@ -16,7 +27,6 @@ import {
   Mail,
   Phone,
   MapPin,
-  FileText,
   CheckCircle,
   XCircle,
   Shield,
@@ -27,40 +37,28 @@ import {
   CreditCard,
   AlertCircle,
   MoreVertical,
-  Download,
   Lock,
   Unlock,
-  ExternalLink,
   Clock,
   FileCheck,
   Store,
-  Package2,
-  Truck,
   BarChart,
   History,
-  Globe,
   MapPin as MapPinIcon,
+  Users as UsersIcon,
+  Briefcase,
+  PauseCircle,
+  Edit,
+  Globe,
   Tag,
-  Percent,
   Award,
   Star,
   TrendingUp,
-  Users as UsersIcon,
-  FileSearch,
-  Briefcase,
-  CheckSquare,
-  XSquare,
-  PauseCircle,
-  PlayCircle,
-  Edit,
-  Trash2,
   Copy,
   Share2,
   Printer,
   MessageSquare,
-  Bell,
-  Eye,
-  EyeOff
+  Bell
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 
@@ -76,8 +74,9 @@ const VendorDetailPage = () => {
   const [showSuspendModal, setShowSuspendModal] = useState(false)
   const [suspensionReason, setSuspensionReason] = useState('')
   const [showReactivateModal, setShowReactivateModal] = useState(false)
-  const [showDocuments, setShowDocuments] = useState(false)
-  const [selectedDocument, setSelectedDocument] = useState(null)
+  const [viewingDocument, setViewingDocument] = useState(null)
+  const [selectedLicense, setSelectedLicense] = useState(null)
+  const [showDocumentViewer, setShowDocumentViewer] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -156,16 +155,6 @@ const VendorDetailPage = () => {
     return colors[status] || colors.pending
   }
 
-  const getStatusIcon = (status) => {
-    const icons = {
-      pending: <Clock className="w-3 h-3 mr-1" />,
-      approved: <CheckCircle className="w-3 h-3 mr-1" />,
-      rejected: <XCircle className="w-3 h-3 mr-1" />,
-      suspended: <Lock className="w-3 h-3 mr-1" />
-    }
-    return icons[status] || <Clock className="w-3 h-3 mr-1" />
-  }
-
   const formatAddress = (address) => {
     if (!address) return 'N/A'
     const parts = [
@@ -179,25 +168,377 @@ const VendorDetailPage = () => {
     return parts.join(', ')
   }
 
+  // Get document count
   const getDocumentCount = () => {
     if (!selectedVendor?.documents) return 0
     return Array.isArray(selectedVendor.documents) ? selectedVendor.documents.length : 0
   }
 
+  // Get document list
   const getDocumentList = () => {
     if (!selectedVendor?.documents) return []
     return Array.isArray(selectedVendor.documents) ? selectedVendor.documents : []
   }
 
-  const viewDocument = (document) => {
-    setSelectedDocument(document)
-    setShowDocuments(true)
+  // Get all licenses and regulatory information
+  const getAllLicenses = () => {
+    const licenses = []
+    
+    // DEA License
+    if (selectedVendor.pharmacyLicense?.deaNumber) {
+      licenses.push({
+        type: 'DEA License',
+        number: selectedVendor.pharmacyLicense.deaNumber,
+        expiration: selectedVendor.pharmacyLicense.deaExpirationDate,
+        state: selectedVendor.pharmacyLicense.deaState,
+        status: selectedVendor.pharmacyLicense.deaExpirationDate && 
+               new Date(selectedVendor.pharmacyLicense.deaExpirationDate) > new Date() ? 
+               'Active' : 'Expired',
+        category: 'Federal'
+      })
+    }
+    
+    // State Pharmacy License
+    if (selectedVendor.pharmacyLicense?.stateLicenseNumber) {
+      licenses.push({
+        type: 'State Pharmacy License',
+        number: selectedVendor.pharmacyLicense.stateLicenseNumber,
+        expiration: selectedVendor.pharmacyLicense.stateLicenseExpirationDate,
+        state: selectedVendor.pharmacyLicense.stateLicenseState,
+        status: selectedVendor.pharmacyLicense.stateLicenseExpirationDate && 
+               new Date(selectedVendor.pharmacyLicense.stateLicenseExpirationDate) > new Date() ? 
+               'Active' : 'Expired',
+        category: 'State'
+      })
+    }
+    
+    // NPI Number
+    if (selectedVendor.pharmacyInfo?.npiNumber) {
+      licenses.push({
+        type: 'NPI Number',
+        number: selectedVendor.pharmacyInfo.npiNumber,
+        expiration: null,
+        state: 'National',
+        status: 'Active',
+        category: 'Federal'
+      })
+    }
+    
+    // Federal EIN
+    if (selectedVendor.pharmacyInfo?.federalEIN) {
+      licenses.push({
+        type: 'Federal EIN',
+        number: selectedVendor.pharmacyInfo.federalEIN,
+        expiration: null,
+        state: 'Federal',
+        status: 'Active',
+        category: 'Federal'
+      })
+    }
+    
+    // State Business License
+    if (selectedVendor.pharmacyLicense?.businessLicenseNumber) {
+      licenses.push({
+        type: 'Business License',
+        number: selectedVendor.pharmacyLicense.businessLicenseNumber,
+        expiration: selectedVendor.pharmacyLicense.businessLicenseExpirationDate,
+        state: selectedVendor.pharmacyLicense.businessLicenseState,
+        status: selectedVendor.pharmacyLicense.businessLicenseExpirationDate && 
+               new Date(selectedVendor.pharmacyLicense.businessLicenseExpirationDate) > new Date() ? 
+               'Active' : 'Expired',
+        category: 'Business'
+      })
+    }
+    
+    // Controlled Substance License
+    if (selectedVendor.pharmacyLicense?.controlledSubstanceLicenseNumber) {
+      licenses.push({
+        type: 'Controlled Substance License',
+        number: selectedVendor.pharmacyLicense.controlledSubstanceLicenseNumber,
+        expiration: selectedVendor.pharmacyLicense.controlledSubstanceLicenseExpirationDate,
+        state: selectedVendor.pharmacyLicense.controlledSubstanceLicenseState,
+        status: selectedVendor.pharmacyLicense.controlledSubstanceLicenseExpirationDate && 
+               new Date(selectedVendor.pharmacyLicense.controlledSubstanceLicenseExpirationDate) > new Date() ? 
+               'Active' : 'Expired',
+        category: 'Federal'
+      })
+    }
+    
+    // Additional licenses from documents
+    if (selectedVendor.documents) {
+      selectedVendor.documents.forEach((doc) => {
+        if (doc.documentType?.toLowerCase().includes('license')) {
+          licenses.push({
+            type: doc.documentType || 'License',
+            number: doc.licenseNumber || 'Not specified',
+            expiration: doc.expirationDate,
+            state: doc.state || 'Not specified',
+            status: doc.expirationDate && new Date(doc.expirationDate) > new Date() ? 'Active' : 'Expired',
+            category: 'Other',
+            document: doc
+          })
+        }
+      })
+    }
+    
+    return licenses
   }
 
-  const downloadDocument = (document) => {
-    if (document.url) {
-      window.open(document.url, '_blank')
+  // Get document icon based on file type
+  const getDocumentIcon = (document) => {
+    const fileName = document.name || document.documentType || ''
+    const fileType = fileName.toLowerCase()
+    const fileUrl = document.url || document.fileUrl || ''
+    
+    if (fileType.includes('.pdf') || fileUrl.includes('.pdf')) {
+      return <FileText className="w-6 h-6 text-red-500" />
+    } else if (fileType.includes('.jpg') || fileType.includes('.jpeg') || 
+               fileType.includes('.png') || fileUrl.includes('.jpg') || 
+               fileUrl.includes('.jpeg') || fileUrl.includes('.png')) {
+      return <FileImage className="w-6 h-6 text-blue-500" />
+    } else if (fileType.includes('.doc') || fileType.includes('.docx') ||
+               fileUrl.includes('.doc') || fileUrl.includes('.docx')) {
+      return <FileText className="w-6 h-6 text-blue-600" />
+    } else {
+      return <File className="w-6 h-6 text-gray-500" />
     }
+  }
+
+  // View single document
+  const viewDocument = (document) => {
+    const fileUrl = document.url || document.fileUrl
+    if (fileUrl) {
+      setViewingDocument(document)
+      setShowDocumentViewer(true)
+    } else {
+      alert('Document URL not available')
+    }
+  }
+
+  // Download single document
+  const downloadDocument = (doc) => {
+  const fileUrl = doc.url || doc.fileUrl
+  if (!fileUrl) {
+    alert('Document URL not available')
+    return
+  }
+
+  const link = window.document.createElement('a')
+  link.href = fileUrl
+  link.download = doc.name || doc.documentType || 'document'
+  link.target = '_blank'
+  link.rel = 'noopener noreferrer'
+
+  window.document.body.appendChild(link)
+  link.click()
+  window.document.body.removeChild(link)
+}
+
+
+  // Download all documents
+  const handleDownloadAllDocuments = () => {
+    if (id) {
+      dispatch(downloadAllDocuments(id))
+        .then((response) => {
+          if (response.payload?.url) {
+            // Create a temporary anchor element for download
+            const link = document.createElement('a')
+            link.href = response.payload.url
+            link.download = `vendor_${id}_documents.zip`
+            link.target = '_blank'
+            link.rel = 'noopener noreferrer'
+            document.body.appendChild(link)
+            link.click()
+            document.body.removeChild(link)
+          }
+        })
+        .catch(error => {
+          console.error('Error downloading documents:', error)
+          alert('Error downloading documents. Please try again.')
+        })
+    }
+  }
+
+  // Render document viewer
+  const renderDocumentViewer = () => {
+    if (!viewingDocument || !showDocumentViewer) return null
+    
+    const fileUrl = viewingDocument.url || viewingDocument.fileUrl
+    const fileName = viewingDocument.name || viewingDocument.documentType || 'Document'
+    const fileType = fileName.toLowerCase()
+    
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center">
+              {getDocumentIcon(viewingDocument)}
+              <h3 className="ml-3 text-lg font-medium text-gray-900">{fileName}</h3>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => downloadDocument(viewingDocument)}
+                className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              >
+                <Download className="w-4 h-4 mr-2" />
+                Download
+              </button>
+              <button
+                onClick={() => {
+                  setShowDocumentViewer(false)
+                  setViewingDocument(null)
+                }}
+                className="p-2 text-gray-400 hover:text-gray-500"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+          
+          <div className="p-4 h-[calc(90vh-120px)] overflow-auto">
+            {fileUrl.includes('.pdf') ? (
+              <iframe
+                src={fileUrl}
+                className="w-full h-full border-0"
+                title={fileName}
+              />
+            ) : fileUrl.match(/\.(jpg|jpeg|png|gif)$/i) ? (
+              <div className="flex items-center justify-center h-full">
+                <img
+                  src={fileUrl}
+                  alt={fileName}
+                  className="max-w-full max-h-full object-contain"
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-full text-gray-500">
+                <FileText className="w-16 h-16 mb-4" />
+                <p className="text-lg mb-2">Document Preview Not Available</p>
+                <p className="text-sm mb-4">This file type cannot be previewed in the browser</p>
+                <a
+                  href={fileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Open in New Tab
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Render license details modal
+  const renderLicenseDetails = () => {
+    if (!selectedLicense) return null
+    
+    return (
+      <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
+        <div className="bg-white rounded-lg p-6 max-w-lg w-full">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium text-gray-900">{selectedLicense.type} Details</h3>
+            <button
+              onClick={() => setSelectedLicense(null)}
+              className="text-gray-400 hover:text-gray-500"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-500">License Number</label>
+              <p className="mt-1 text-sm text-gray-900">{selectedLicense.number}</p>
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-500">Status</label>
+              <span className={`mt-1 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                selectedLicense.status === 'Active' 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {selectedLicense.status}
+              </span>
+            </div>
+            
+            {selectedLicense.state && (
+              <div>
+                <label className="block text-sm font-medium text-gray-500">State/Region</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedLicense.state}</p>
+              </div>
+            )}
+            
+            {selectedLicense.expiration && (
+              <div>
+                <label className="block text-sm font-medium text-gray-500">Expiration Date</label>
+                <p className="mt-1 text-sm text-gray-900">
+                  {format(new Date(selectedLicense.expiration), 'MMMM d, yyyy')}
+                </p>
+                <p className={`mt-1 text-xs ${
+                  new Date(selectedLicense.expiration) > new Date()
+                    ? 'text-green-600'
+                    : 'text-red-600'
+                }`}>
+                  {new Date(selectedLicense.expiration) > new Date()
+                    ? `Expires in ${formatDistanceToNow(new Date(selectedLicense.expiration))}`
+                    : `Expired ${formatDistanceToNow(new Date(selectedLicense.expiration))} ago`
+                  }
+                </p>
+              </div>
+            )}
+            
+            {selectedLicense.category && (
+              <div>
+                <label className="block text-sm font-medium text-gray-500">Category</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedLicense.category}</p>
+              </div>
+            )}
+            
+            {selectedLicense.document && (
+              <div className="pt-4 border-t">
+                <label className="block text-sm font-medium text-gray-500">Supporting Document</label>
+                <div className="mt-2 flex items-center">
+                  {getDocumentIcon(selectedLicense.document)}
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm text-gray-900">
+                      {selectedLicense.document.name || selectedLicense.document.documentType}
+                    </p>
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => viewDocument(selectedLicense.document)}
+                      className="text-blue-600 hover:text-blue-500 text-sm"
+                    >
+                      <Eye className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => downloadDocument(selectedLicense.document)}
+                      className="text-gray-600 hover:text-gray-500 text-sm"
+                    >
+                      <Download className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          
+          <div className="mt-6 flex justify-end">
+            <button
+              onClick={() => setSelectedLicense(null)}
+              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              Close
+            </button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -244,17 +585,8 @@ const VendorDetailPage = () => {
   }
 
   const { bg: statusBg, text: statusText, icon: StatusIcon } = getStatusColor(selectedVendor.status)
-
-  // Calculate some stats for display
-  const stats = {
-    documents: getDocumentCount(),
-    locations: selectedVendor.pharmacyQuestions?.numberOfLocations || 1,
-    yearsInBusiness: selectedVendor.pharmacyQuestions?.yearsInBusiness || 'N/A',
-    totalOrders: 156, // Placeholder
-    totalRevenue: '$12,458', // Placeholder
-    completionRate: '92%', // Placeholder
-    rating: '4.8' // Placeholder
-  }
+  const documents = getDocumentList()
+  const licenses = getAllLicenses()
 
   return (
     <div className="space-y-6">
@@ -343,18 +675,18 @@ const VendorDetailPage = () => {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Documents</p>
-              <p className="text-xl font-bold text-gray-900">{stats.documents}</p>
+              <p className="text-xl font-bold text-gray-900">{documents.length}</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
             <div className="p-2 bg-green-100 rounded-lg">
-              <Store className="w-6 h-6 text-green-600" />
+              <Shield className="w-6 h-6 text-green-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Locations</p>
-              <p className="text-xl font-bold text-gray-900">{stats.locations}</p>
+              <p className="text-sm font-medium text-gray-600">Licenses</p>
+              <p className="text-xl font-bold text-gray-900">{licenses.length}</p>
             </div>
           </div>
         </div>
@@ -364,8 +696,11 @@ const VendorDetailPage = () => {
               <Calendar className="w-6 h-6 text-purple-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Years</p>
-              <p className="text-xl font-bold text-gray-900">{stats.yearsInBusiness}</p>
+              <p className="text-sm font-medium text-gray-600">Registered</p>
+              <p className="text-sm font-bold text-gray-900">
+                {selectedVendor.registeredAt ? 
+                  format(new Date(selectedVendor.registeredAt), 'MMM d, yyyy') : 'N/A'}
+              </p>
             </div>
           </div>
         </div>
@@ -375,19 +710,21 @@ const VendorDetailPage = () => {
               <ShoppingCart className="w-6 h-6 text-orange-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Orders</p>
-              <p className="text-xl font-bold text-gray-900">{stats.totalOrders}</p>
+              <p className="text-sm font-medium text-gray-600">Status</p>
+              <p className="text-sm font-bold text-gray-900 capitalize">{selectedVendor.status}</p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
             <div className="p-2 bg-indigo-100 rounded-lg">
-              <DollarSign className="w-6 h-6 text-indigo-600" />
+              <Building className="w-6 h-6 text-indigo-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Revenue</p>
-              <p className="text-xl font-bold text-gray-900">{stats.totalRevenue}</p>
+              <p className="text-sm font-medium text-gray-600">Locations</p>
+              <p className="text-xl font-bold text-gray-900">
+                {selectedVendor.pharmacyQuestions?.numberOfLocations || 1}
+              </p>
             </div>
           </div>
         </div>
@@ -398,7 +735,7 @@ const VendorDetailPage = () => {
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Rating</p>
-              <p className="text-xl font-bold text-gray-900">{stats.rating}/5</p>
+              <p className="text-xl font-bold text-gray-900">4.8/5</p>
             </div>
           </div>
         </div>
@@ -409,9 +746,9 @@ const VendorDetailPage = () => {
         <nav className="-mb-px flex space-x-8 overflow-x-auto">
           {[
             { id: 'info', label: 'Information', icon: Briefcase },
-            { id: 'documents', label: 'Documents', icon: FileText, badge: getDocumentCount() },
+            { id: 'documents', label: 'Documents', icon: FileText, badge: documents.length },
+            { id: 'licenses', label: 'Licenses', icon: Shield, badge: licenses.length },
             { id: 'contacts', label: 'Contacts', icon: UsersIcon },
-            { id: 'licenses', label: 'Licenses', icon: Shield },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
             { id: 'analytics', label: 'Analytics', icon: BarChart },
             { id: 'history', label: 'History', icon: History }
@@ -616,43 +953,49 @@ const VendorDetailPage = () => {
                   </div>
                 </div>
 
-                {/* License Information */}
+                {/* License Summary */}
                 <div className="border border-gray-200 rounded-lg p-5">
                   <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
                     <FileCheck className="w-5 h-5 mr-2 text-gray-500" />
-                    License Information
+                    License Summary
                   </h3>
                   <div className="space-y-3">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">DEA Number</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.deaNumber || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">DEA Expiration</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.deaExpirationDate ? 
-                            format(new Date(selectedVendor.pharmacyLicense.deaExpirationDate), 'MMM d, yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">State License</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.stateLicenseNumber || 'N/A'}
-                        </p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-500">License Expiration</label>
-                        <p className="mt-1 text-sm text-gray-900">
-                          {selectedVendor.pharmacyLicense?.stateLicenseExpirationDate ? 
-                            format(new Date(selectedVendor.pharmacyLicense.stateLicenseExpirationDate), 'MMM d, yyyy') : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
+                    {licenses.length > 0 ? (
+                      licenses.slice(0, 3).map((license, index) => (
+                        <div 
+                          key={index} 
+                          className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                          onClick={() => setSelectedLicense(license)}
+                        >
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">{license.type}</p>
+                            <p className="text-sm text-gray-500">{license.number}</p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
+                              license.status === 'Active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
+                              {license.status}
+                            </span>
+                            {license.expiration && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Expires: {format(new Date(license.expiration), 'MMM d, yyyy')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-gray-500">No license information available</p>
+                    )}
+                    {licenses.length > 3 && (
+                      <button
+                        onClick={() => setActiveTab('licenses')}
+                        className="w-full text-center text-sm text-blue-600 hover:text-blue-500 py-2"
+                      >
+                        View all {licenses.length} licenses →
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -705,35 +1048,49 @@ const VendorDetailPage = () => {
           <div className="p-6">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900">Documents & Licenses</h3>
+                <h3 className="text-lg font-semibold text-gray-900">Documents & Files</h3>
                 <p className="text-sm text-gray-600 mt-1">
-                  {getDocumentCount()} document{getDocumentCount() !== 1 ? 's' : ''} uploaded
+                  {documents.length} document{documents.length !== 1 ? 's' : ''} uploaded
                 </p>
               </div>
               <div className="flex space-x-2">
-                <button className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                <button 
+                  className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  onClick={() => alert('Upload functionality coming soon')}
+                >
                   <Upload className="w-4 h-4 mr-2" />
-                  Upload
+                  Upload New
                 </button>
-                <button className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
-                  <Download className="w-4 h-4 mr-2" />
+                <button 
+                  className="inline-flex items-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  onClick={handleDownloadAllDocuments}
+                  disabled={documents.length === 0}
+                >
+                  <FileDown className="w-4 h-4 mr-2" />
                   Download All
                 </button>
               </div>
             </div>
             
-            {getDocumentCount() > 0 ? (
+            {documents.length > 0 ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {getDocumentList().map((doc, index) => (
+                {documents.map((doc, index) => (
                   <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
                     <div className="flex items-start">
-                      <FileText className="w-8 h-8 text-gray-400 flex-shrink-0" />
+                      <div className="flex-shrink-0">
+                        {getDocumentIcon(doc)}
+                      </div>
                       <div className="ml-3 flex-1">
                         <p className="text-sm font-medium text-gray-900 truncate">
                           {doc.name || doc.documentType || `Document ${index + 1}`}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
-                          Uploaded: {doc.uploadedAt ? format(new Date(doc.uploadedAt), 'MMM d, yyyy') : 'Recently'}
+                          {doc.documentType && (
+                            <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded mr-2">
+                              {doc.documentType}
+                            </span>
+                          )}
+                          {doc.uploadedAt ? format(new Date(doc.uploadedAt), 'MMM d, yyyy') : 'Recently'}
                         </p>
                         {doc.size && (
                           <p className="text-xs text-gray-400 mt-1">
@@ -741,24 +1098,22 @@ const VendorDetailPage = () => {
                           </p>
                         )}
                         <div className="mt-3 flex items-center space-x-3">
-                          {doc.url && (
-                            <>
-                              <button
-                                onClick={() => viewDocument(doc)}
-                                className="inline-flex items-center text-sm text-blue-600 hover:text-blue-500"
-                              >
-                                <Eye className="w-4 h-4 mr-1" />
-                                View
-                              </button>
-                              <button
-                                onClick={() => downloadDocument(doc)}
-                                className="inline-flex items-center text-sm text-gray-600 hover:text-gray-500"
-                              >
-                                <Download className="w-4 h-4 mr-1" />
-                                Download
-                              </button>
-                            </>
-                          )}
+                          <button
+                            onClick={() => viewDocument(doc)}
+                            className="inline-flex items-center text-sm text-blue-600 hover:text-blue-500"
+                            title="View Document"
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            View
+                          </button>
+                          <button
+                            onClick={() => downloadDocument(doc)}
+                            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-500"
+                            title="Download Document"
+                          >
+                            <Download className="w-4 h-4 mr-1" />
+                            Download
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -776,6 +1131,88 @@ const VendorDetailPage = () => {
                   <Upload className="w-4 h-4 mr-2" />
                   Request Documents
                 </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Licenses Tab */}
+        {activeTab === 'licenses' && (
+          <div className="p-6">
+            <div className="mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Licenses & Regulatory Information</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {licenses.length} license{licenses.length !== 1 ? 's' : ''} and regulatory documents
+              </p>
+            </div>
+            
+            {licenses.length > 0 ? (
+              <div className="space-y-4">
+                {/* Group licenses by category */}
+                {['Federal', 'State', 'Business', 'Other'].map((category) => {
+                  const categoryLicenses = licenses.filter(license => license.category === category)
+                  if (categoryLicenses.length === 0) return null
+                  
+                  return (
+                    <div key={category} className="border border-gray-200 rounded-lg overflow-hidden">
+                      <div className="bg-gray-50 px-4 py-3">
+                        <h4 className="text-sm font-medium text-gray-900">{category} Licenses</h4>
+                      </div>
+                      <div className="divide-y divide-gray-200">
+                        {categoryLicenses.map((license, index) => (
+                          <div 
+                            key={index} 
+                            className="p-4 hover:bg-gray-50 cursor-pointer"
+                            onClick={() => setSelectedLicense(license)}
+                          >
+                            <div className="flex items-center justify-between">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{license.type}</p>
+                                <p className="text-sm text-gray-500">{license.number}</p>
+                                {license.state && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    <MapPinIcon className="w-3 h-3 inline mr-1" />
+                                    {license.state}
+                                  </p>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  license.status === 'Active' 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-red-100 text-red-800'
+                                }`}>
+                                  {license.status}
+                                </span>
+                                {license.expiration && (
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Expires: {format(new Date(license.expiration), 'MMM d, yyyy')}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {license.document && (
+                              <div className="mt-3 flex items-center text-sm text-gray-500">
+                                {getDocumentIcon(license.document)}
+                                <span className="ml-2 truncate">
+                                  {license.document.name || license.document.documentType}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <Shield className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No licenses found</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  No license information has been provided by this vendor.
+                </p>
               </div>
             )}
           </div>
@@ -858,19 +1295,7 @@ const VendorDetailPage = () => {
           </div>
         )}
 
-        {/* Other Tabs - Placeholder Content */}
-        {activeTab === 'licenses' && (
-          <div className="p-6">
-            <div className="text-center py-12">
-              <Shield className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">License Management</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Detailed license information and renewals coming soon.
-              </p>
-            </div>
-          </div>
-        )}
-
+        {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="p-6">
             <div className="text-center py-12">
@@ -883,6 +1308,7 @@ const VendorDetailPage = () => {
           </div>
         )}
 
+        {/* Analytics Tab */}
         {activeTab === 'analytics' && (
           <div className="p-6">
             <div className="text-center py-12">
@@ -895,6 +1321,7 @@ const VendorDetailPage = () => {
           </div>
         )}
 
+        {/* History Tab */}
         {activeTab === 'history' && (
           <div className="p-6">
             <div className="text-center py-12">
@@ -1018,6 +1445,12 @@ const VendorDetailPage = () => {
           </div>
         </div>
       )}
+
+      {/* Document Viewer Modal */}
+      {renderDocumentViewer()}
+
+      {/* License Details Modal */}
+      {renderLicenseDetails()}
     </div>
   )
 }

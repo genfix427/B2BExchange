@@ -96,42 +96,42 @@ const LoginPage = () => {
   }
 
   const handleSubmit = async (e) => {
-  e.preventDefault()
-  if (!validateForm()) return
+    e.preventDefault()
+    if (!validateForm()) return
 
-  try {
-    await dispatch(login(formData)).unwrap()
-    // Approved users handled by useEffect
-  } catch (err) {
-  if (err?.isStatusError) {
-    dispatch(clearAuth()) // ⛔ stop auth guards
+    try {
+      await dispatch(login(formData)).unwrap()
+      // Approved users handled by useEffect
+    } catch (err) {
+      if (err?.isStatusError) {
+        dispatch(clearAuth()) // ⛔ stop auth guards
 
-    if (err.status === 'pending') {
-      navigate('/pending-approval', { replace: true })
-      return
+        if (err.status === 'pending') {
+          navigate('/pending-approval', { replace: true })
+          return
+        }
+
+        if (err.status === 'rejected') {
+          navigate('/account-rejected', {
+            replace: true,
+            state: { reason: err.rejectionReason }
+          })
+          return
+        }
+
+        if (err.status === 'suspended') {
+          navigate('/account-suspended', {
+            replace: true,
+            state: { reason: err.suspensionReason }
+          })
+          return
+        }
+      }
+
+      setApiError(err?.message || 'Login failed')
     }
 
-    if (err.status === 'rejected') {
-      navigate('/account-rejected', {
-        replace: true,
-        state: { reason: err.rejectionReason }
-      })
-      return
-    }
-
-    if (err.status === 'suspended') {
-      navigate('/account-suspended', {
-        replace: true,
-        state: { reason: err.suspensionReason }
-      })
-      return
-    }
   }
-
-  setApiError(err?.message || 'Login failed')
-}
-
-}
 
 
 

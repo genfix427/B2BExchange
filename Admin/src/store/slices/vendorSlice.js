@@ -260,6 +260,32 @@ export const fetchDashboardStats = createAsyncThunk(
   }
 )
 
+// vendorSlice.js
+export const downloadAllDocuments = createAsyncThunk(
+  'vendors/downloadAllDocuments',
+  async (vendorId, { rejectWithValue }) => {
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/admin/vendors/${vendorId}/documents/download`,
+        {
+          method: 'GET',
+          credentials: 'include'
+        }
+      )
+
+      if (!res.ok) {
+        throw new Error('Failed to download documents')
+      }
+
+      const data = await res.json()
+      return data // { url: "zip-file-url" }
+    } catch (error) {
+      return rejectWithValue(error.message)
+    }
+  }
+)
+
+
 const initialState = {
   vendors: [],
   selectedVendor: null,

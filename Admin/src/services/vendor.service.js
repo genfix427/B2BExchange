@@ -342,3 +342,6 @@ export const vendorService = {
     }
   }
 }
+
+// add at the bottom of vendor.service.js
+// vendorService.getAllVendors = vendorService.getVendors

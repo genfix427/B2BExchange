@@ -29,6 +29,8 @@ import About from './pages/About'
 import Contact from './pages/Contact'
 import CreateProductPage from './pages/vendor/CreateProductPage'
 import VendorProductsPage from './pages/vendor/VendorProductsPage'
+import StorePage from './pages/vendor/StorePage'
+import EditProductPage from './pages/vendor/EditProductPage'
 
 const App = () => {
 
@@ -55,6 +57,7 @@ const App = () => {
           <Route path="/pending-approval" element={<PendingApprovalPage />} />
           <Route path="/account-rejected" element={<AccountRejectedPage />} />
           <Route path="/account-suspended" element={<AccountSuspendedPage />} />
+          <Route path="/store" element={<StorePage />} />
 
           {/* Protected */}
           <Route
@@ -93,14 +96,14 @@ const App = () => {
             }
           />
 
-          {/* <Route
+          <Route
             path="/vendor/products/edit/:id"
             element={
               <ProtectedRoute>
                 <EditProductPage />
               </ProtectedRoute>
             }
-          /> */}
+          />
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

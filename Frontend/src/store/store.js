@@ -6,6 +6,7 @@ import authReducer from './slices/authSlice'
 import vendorReducer from './slices/vendorSlice'
 import registrationReducer from './slices/registrationSlice'
 import vendorProductReducer from './slices/vendorProductSlice';
+import storeReducer from './slices/storeSlice';
 
 // Create a separate persist config for auth
 const authPersistConfig = {
@@ -24,6 +25,7 @@ const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authReducer),
   vendor: vendorReducer,
   vendorProducts: vendorProductReducer,
+  store: storeReducer,
   registration: persistReducer(registrationPersistConfig, registrationReducer)
 })
 

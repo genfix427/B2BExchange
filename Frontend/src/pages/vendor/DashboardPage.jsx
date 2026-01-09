@@ -21,7 +21,7 @@ const VendorDashboardPage = () => {
   const dispatch = useDispatch()
   const { user } = useSelector((state) => state.auth)
   const { stats } = useSelector((state) => state.vendor)
-  
+
   useEffect(() => {
     // Mock data - in production, fetch from API
     const mockStats = {
@@ -36,7 +36,7 @@ const VendorDashboardPage = () => {
     }
     dispatch(setStats(mockStats))
   }, [dispatch])
-  
+
   const StatCard = ({ title, value, icon: Icon, change, trend = 'up' }) => (
     <div className="bg-white overflow-hidden shadow rounded-lg">
       <div className="p-5">
@@ -69,7 +69,7 @@ const VendorDashboardPage = () => {
       </div>
     </div>
   )
-  
+
   const QuickAction = ({ title, description, icon: Icon, color, to }) => (
     <Link
       to={to}
@@ -86,16 +86,16 @@ const VendorDashboardPage = () => {
       </div>
     </Link>
   )
-  
+
   const OrderItem = ({ id, customer, amount, status, date }) => {
     const statusConfig = {
       pending: { color: 'bg-yellow-100 text-yellow-800', icon: Clock },
       completed: { color: 'bg-green-100 text-green-800', icon: CheckCircle },
       cancelled: { color: 'bg-red-100 text-red-800', icon: AlertCircle }
     }
-    
+
     const config = statusConfig[status] || statusConfig.pending
-    
+
     return (
       <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
         <div>
@@ -112,7 +112,7 @@ const VendorDashboardPage = () => {
       </div>
     )
   }
-  
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -124,7 +124,7 @@ const VendorDashboardPage = () => {
           Here's what's happening with your pharmacy today.
         </p>
       </div>
-      
+
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
@@ -156,7 +156,7 @@ const VendorDashboardPage = () => {
           trend="up"
         />
       </div>
-      
+
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column - Quick Actions & Recent Orders */}
@@ -165,13 +165,26 @@ const VendorDashboardPage = () => {
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <QuickAction
-                title="Add New Product"
-                description="List new pharmaceutical products"
-                icon={Package}
-                color="bg-blue-500"
-                to="/products/new"
-              />
+              <Link to="/vendor/products">
+                <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow cursor-pointer">
+                  <div className="flex items-center">
+                    <div className="p-2 bg-purple-100 rounded-lg">
+                      <Package className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm font-medium text-gray-600">Products</p>
+                      <p className="text-xl font-bold text-gray-900">{stats?.totalProducts || 0}</p>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+              <Link to="/vendor/products">
+                <div className="bg-white rounded-lg shadow p-6 hover:shadow-md transition-shadow text-center">
+                  <Package className="h-8 w-8 text-blue-600 mx-auto mb-2" />
+                  <p className="text-sm font-medium text-gray-900">Manage Products</p>
+                  <p className="text-xs text-gray-500 mt-1">Add, edit, delete products</p>
+                </div>
+              </Link>
               <QuickAction
                 title="View Analytics"
                 description="Check sales performance"
@@ -195,7 +208,7 @@ const VendorDashboardPage = () => {
               />
             </div>
           </div>
-          
+
           {/* Recent Orders */}
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
@@ -236,7 +249,7 @@ const VendorDashboardPage = () => {
             </div>
           </div>
         </div>
-        
+
         {/* Right Column - Recent Activity & Calendar */}
         <div className="space-y-6">
           {/* Recent Activity */}
@@ -278,7 +291,7 @@ const VendorDashboardPage = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Calendar */}
           <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
@@ -309,7 +322,7 @@ const VendorDashboardPage = () => {
               </div>
             </div>
           </div>
-          
+
           {/* Performance Summary */}
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Performance</h2>

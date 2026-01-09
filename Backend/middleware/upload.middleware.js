@@ -1,62 +1,102 @@
-import multer from 'multer';
+import multer from 'multer'
 
-// Configure multer for memory storage
-const storage = multer.memoryStorage();
+/* =========================
+   STORAGE (Memory for Cloudinary)
+========================= */
+const storage = multer.memoryStorage()
 
-// File filter for validation
+/* =========================
+   FILE FILTER
+========================= */
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = [
+  const allowedMimeTypes = [
+    // Images
     'image/jpeg',
     'image/jpg',
     'image/png',
+
+    // Documents
     'application/pdf',
     'application/msword',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-  ];
+  ]
 
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
+  if (allowedMimeTypes.includes(file.mimetype)) {
+    cb(null, true)
   } else {
-    cb(new Error('Invalid file type. Only JPEG, PNG, PDF, DOC, DOCX are allowed.'), false);
+    cb(
+      new Error(
+        'Invalid file type. Allowed: JPG, PNG, PDF, DOC, DOCX'
+      ),
+      false
+    )
   }
-};
+}
 
-// Create upload middleware
-export const uploadDocuments = multer({
-  storage: storage,
-  fileFilter: fileFilter,
+/* =========================
+   GENERIC UPLOAD (REUSABLE)
+   👉 upload.single('image')
+   👉 upload.array('files', n)
+========================= */
+export const upload = multer({
+  storage,
+  fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB limit
-    files: 7 // Exactly 7 files
+    fileSize: 5 * 1024 * 1024 // 5MB per file
   }
-}).array('documents', 7);
+})
 
-// Middleware to handle upload errors
+/* =========================
+   DOCUMENT UPLOAD (FIXED)
+   👉 uploadDocuments (DO NOT CHANGE ROUTES)
+========================= */
+export const uploadDocuments = multer({
+  storage,
+  fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024,
+    files: 7
+  }
+}).array('documents', 7)
+
+/* =========================
+   ERROR HANDLER
+========================= */
 export const handleUploadError = (err, req, res, next) => {
   if (err instanceof multer.MulterError) {
-    if (err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({
-        success: false,
-        message: 'File too large. Maximum size is 5MB per file.'
-      });
+    switch (err.code) {
+      case 'LIMIT_FILE_SIZE':
+        return res.status(400).json({
+          success: false,
+          message: 'File size exceeds 5MB limit'
+        })
+
+      case 'LIMIT_FILE_COUNT':
+        return res.status(400).json({
+          success: false,
+          message: 'Maximum 7 documents allowed'
+        })
+
+      case 'LIMIT_UNEXPECTED_FILE':
+        return res.status(400).json({
+          success: false,
+          message: 'Unexpected file field'
+        })
+
+      default:
+        return res.status(400).json({
+          success: false,
+          message: err.message
+        })
     }
-    if (err.code === 'LIMIT_FILE_COUNT') {
-      return res.status(400).json({
-        success: false,
-        message: 'Exactly 7 documents are required.'
-      });
-    }
-    if (err.code === 'LIMIT_UNEXPECTED_FILE') {
-      return res.status(400).json({
-        success: false,
-        message: 'Unexpected file upload.'
-      });
-    }
-  } else if (err) {
+  }
+
+  if (err) {
     return res.status(400).json({
       success: false,
       message: err.message
-    });
+    })
   }
-  next();
-};
+
+  next()
+}

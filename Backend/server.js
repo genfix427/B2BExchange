@@ -21,6 +21,9 @@ import adminRoutes from './routes/admin.routes.js';
 import profileRoutes from './routes/profile.routes.js';
 import adminAuthRoutes from './routes/adminAuth.routes.js';
 
+import vendorProductRoutes from './routes/vendor/product.routes.js';
+import adminProductRoutes from './routes/admin/product.routes.js';
+
 // Import middleware
 import errorHandler from './middleware/error.middleware.js';
 
@@ -94,6 +97,9 @@ const authLimiter = rateLimit({
 app.use('/api/vendor/auth', authRoutes);
 app.use('/api/admin', authLimiter);
 app.use('/api/admin/auth', adminAuthRoutes);
+
+app.use('/api/vendor/products', vendorProductRoutes);
+app.use('/api/admin/products', adminProductRoutes);
 
 /* =========================
    STATIC FILES

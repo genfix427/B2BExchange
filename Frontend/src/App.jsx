@@ -27,6 +27,8 @@ import FAQ from './pages/FAQ'
 import Shipping from './pages/Shipping'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import CreateProductPage from './pages/vendor/CreateProductPage'
+import VendorProductsPage from './pages/vendor/VendorProductsPage'
 
 const App = () => {
 
@@ -72,6 +74,33 @@ const App = () => {
               </ProtectedRoute>
             }
           />
+
+          <Route
+            path="/vendor/products"
+            element={
+              <ProtectedRoute>
+                <VendorProductsPage />
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="/vendor/products/create"
+            element={
+              <ProtectedRoute>
+                <CreateProductPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* <Route
+            path="/vendor/products/edit/:id"
+            element={
+              <ProtectedRoute>
+                <EditProductPage />
+              </ProtectedRoute>
+            }
+          /> */}
 
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />

@@ -61,6 +61,7 @@ import {
   Bell
 } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
+import VendorAdminProductsList from '../../components/vendors/VendorAdminProductsList';
 
 const VendorDetailPage = () => {
   const { id } = useParams()
@@ -749,6 +750,7 @@ const VendorDetailPage = () => {
             { id: 'documents', label: 'Documents', icon: FileText, badge: documents.length },
             { id: 'licenses', label: 'Licenses', icon: Shield, badge: licenses.length },
             { id: 'contacts', label: 'Contacts', icon: UsersIcon },
+            { id: 'products', label: 'Products', icon: Package },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
             { id: 'analytics', label: 'Analytics', icon: BarChart },
             { id: 'history', label: 'History', icon: History }
@@ -1295,6 +1297,15 @@ const VendorDetailPage = () => {
           </div>
         )}
 
+        {/* Product Tab */}
+        {activeTab === 'products' && (
+          <div className="p-6">
+            <div className="text-center py-12">
+              <Package className="mx-auto h-12 w-12 text-gray-400" />
+              <VendorAdminProductsList />
+            </div>
+          </div>
+        )}
         {/* Orders Tab */}
         {activeTab === 'orders' && (
           <div className="p-6">

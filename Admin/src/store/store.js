@@ -4,6 +4,7 @@ import storage from 'redux-persist/lib/storage'
 import { combineReducers } from 'redux'
 import adminAuthReducer from './slices/adminAuthSlice'
 import vendorReducer from './slices/vendorSlice'
+import adminProductReducer from './slices/adminProductSlice';
 
 const persistConfig = {
   key: 'adminRoot',
@@ -13,7 +14,8 @@ const persistConfig = {
 
 const rootReducer = combineReducers({
   adminAuth: adminAuthReducer,
-  vendors: vendorReducer
+  vendors: vendorReducer,
+  adminProducts: adminProductReducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

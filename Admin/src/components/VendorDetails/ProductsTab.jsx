@@ -11,7 +11,11 @@ const ProductsTab = ({ vendor }) => {
           Products offered by {vendor.pharmacyInfo?.legalBusinessName || 'this vendor'}
         </p>
       </div>
-      <VendorAdminProductsList />
+      {/* Pass vendorId and vendorName as props */}
+      <VendorAdminProductsList 
+        vendorId={vendor._id}
+        vendorName={vendor.pharmacyInfo?.legalBusinessName || vendor.pharmacyInfo?.dba || 'Vendor'}
+      />
     </div>
   )
 }

@@ -1,4 +1,5 @@
 // controllers/admin/product.controller.js
+import mongoose from 'mongoose'; // Add this import
 import Product from '../../models/Product.model.js';
 import Vendor from '../../models/Vendor.model.js';
 import { deleteFromCloudinary } from '../../services/cloudinary.service.js';
@@ -31,9 +32,17 @@ export const getAllProducts = async (req, res, next) => {
             ];
         }
 
-        // ✅ FIX: Vendor filter (ObjectId cast)
-        if (vendor && mongoose.Types.ObjectId.isValid(vendor)) {
-            query.vendor = new mongoose.Types.ObjectId(vendor);
+        // ✅ VENDOR FILTER - Fixed
+        if (vendor) {
+            // Check if it's a valid ObjectId
+            if (mongoose.Types.ObjectId.isValid(vendor)) {
+                query.vendor = new mongoose.Types.ObjectId(vendor);
+            } else {
+                return res.status(400).json({
+                    success: false,
+                    message: 'Invalid vendor ID'
+                });
+            }
         }
 
         // ✅ Status filter
@@ -45,11 +54,13 @@ export const getAllProducts = async (req, res, next) => {
             [sort]: order === 'desc' ? -1 : 1
         };
 
+        // Fetch products with vendor filter
         const products = await Product.find(query)
-            .populate(
-                'vendor',
-                'pharmacyInfo.legalBusinessName pharmacyInfo.dba email status'
-            )
+            .populate({
+                path: 'vendor',
+                select: 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email status',
+                model: 'Vendor'
+            })
             .sort(sortOptions)
             .skip(skip)
             .limit(Number(limit));
@@ -59,6 +70,119 @@ export const getAllProducts = async (req, res, next) => {
         res.status(200).json({
             success: true,
             data: products,
+            pagination: {
+                total,
+                page: Number(page),
+                limit: Number(limit),
+                pages: Math.ceil(total / limit)
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get products by specific vendor (admin)
+// @route   GET /api/admin/vendors/:vendorId/products
+// @access  Private (Admin)
+export const getVendorProducts = async (req, res, next) => {
+    try {
+        const { vendorId } = req.params;
+        const {
+            page = 1,
+            limit = 10,
+            search = '',
+            status = '',
+            sort = 'createdAt',
+            order = 'desc'
+        } = req.query;
+
+        // Validate vendor ID
+        if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid vendor ID'
+            });
+        }
+
+        // Check if vendor exists
+        const vendorExists = await Vendor.findById(vendorId);
+        if (!vendorExists) {
+            return res.status(404).json({
+                success: false,
+                message: 'Vendor not found'
+            });
+        }
+
+        const skip = (page - 1) * limit;
+        const query = { vendor: vendorId };
+
+        // 🔎 Search filter
+        if (search) {
+            query.$or = [
+                { ndcNumber: { $regex: search, $options: 'i' } },
+                { productName: { $regex: search, $options: 'i' } },
+                { manufacturer: { $regex: search, $options: 'i' } }
+            ];
+        }
+
+        // ✅ Status filter
+        if (status && ['active', 'inactive', 'out_of_stock'].includes(status)) {
+            query.status = status;
+        }
+
+        const sortOptions = {
+            [sort]: order === 'desc' ? -1 : 1
+        };
+
+        // Fetch products for this vendor
+        const products = await Product.find(query)
+            .populate({
+                path: 'vendor',
+                select: 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email',
+                model: 'Vendor'
+            })
+            .sort(sortOptions)
+            .skip(skip)
+            .limit(Number(limit));
+
+        const total = await Product.countDocuments(query);
+
+        // Calculate vendor-specific stats
+        const vendorStats = await Product.aggregate([
+            { $match: { vendor: new mongoose.Types.ObjectId(vendorId) } },
+            {
+                $group: {
+                    _id: null,
+                    totalProducts: { $sum: 1 },
+                    activeProducts: {
+                        $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+                    },
+                    outOfStockProducts: {
+                        $sum: { $cond: [{ $eq: ['$status', 'out_of_stock'] }, 1, 0] }
+                    },
+                    totalStock: { $sum: '$quantityInStock' },
+                    totalValue: { $sum: { $multiply: ['$quantityInStock', '$price'] } },
+                    avgPrice: { $avg: '$price' }
+                }
+            }
+        ]);
+
+        res.status(200).json({
+            success: true,
+            data: products,
+            stats: vendorStats[0] || {
+                totalProducts: 0,
+                activeProducts: 0,
+                outOfStockProducts: 0,
+                totalStock: 0,
+                totalValue: 0,
+                avgPrice: 0
+            },
+            vendor: {
+                _id: vendorExists._id,
+                name: vendorExists.pharmacyInfo?.legalBusinessName || vendorExists.pharmacyInfo?.dba || 'Unknown Vendor'
+            },
             pagination: {
                 total,
                 page: Number(page),

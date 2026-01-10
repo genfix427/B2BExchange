@@ -14,6 +14,12 @@ export const productService = {
     return response.data;
   },
 
+  async getVendorProducts(vendorId, params = {}) {
+    const query = new URLSearchParams(params).toString();
+    const response = await api.get(`/admin/products/vendor/${vendorId}${query ? `?${query}` : ''}`);
+    return response;
+  },
+
   async updateProductAdmin(id, data) {
     const response = await api.put(`/admin/products/${id}`, data);
     return response.data;

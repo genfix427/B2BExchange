@@ -19,80 +19,56 @@ import {
   BarChart,
   ShoppingBag
 } from 'lucide-react';
-import { fetchAllProducts, deleteProductAdmin } from '../../store/slices/adminProductSlice';
+import { fetchVendorProducts, deleteProductAdmin } from '../../store/slices/adminProductSlice';
 
 const VendorAdminProductsList = ({ vendorId, vendorName }) => {
   const dispatch = useDispatch();
-  const { products, loading, pagination } = useSelector((state) => state.adminProducts);
+  const { vendorProducts, loading, vendorStats, pagination } = useSelector((state) => state.adminProducts);
   
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const [vendorProducts, setVendorProducts] = useState([]);
-  const [stats, setStats] = useState({
-    totalProducts: 0,
-    activeProducts: 0,
-    outOfStockProducts: 0,
-    totalStock: 0,
-    totalValue: 0,
-    avgPrice: 0
-  });
 
   // Fetch products for this vendor
   useEffect(() => {
-  if (vendorId) {
-    dispatch(fetchAllProducts({
-      page: currentPage,
-      limit: 10,
-      search,
-      vendor: vendorId,
-      status: statusFilter
-    }));
-  }
-}, [dispatch, vendorId, search, statusFilter, currentPage]);
-
-// 2️⃣ Sync redux → local vendorProducts ✅ FIX
-useEffect(() => {
-  setVendorProducts(products || []);
-}, [products]);
-
-// 3️⃣ Calculate stats
-useEffect(() => {
-  const totalProducts = vendorProducts.length;
-  const activeProducts = vendorProducts.filter(p => p.status === 'active').length;
-  const outOfStockProducts = vendorProducts.filter(p => p.status === 'out_of_stock').length;
-  const totalStock = vendorProducts.reduce((sum, p) => sum + (p.quantityInStock || 0), 0);
-  const totalValue = vendorProducts.reduce(
-    (sum, p) => sum + ((p.quantityInStock || 0) * (p.price || 0)),
-    0
-  );
-
-  setStats({
-    totalProducts,
-    activeProducts,
-    outOfStockProducts,
-    totalStock,
-    totalValue,
-    avgPrice: totalStock ? totalValue / totalStock : 0
-  });
-}, [vendorProducts]);
+    if (vendorId) {
+      dispatch(fetchVendorProducts({
+        vendorId,
+        params: {
+          page: currentPage,
+          limit: 10,
+          search,
+          status: statusFilter
+        }
+      }));
+    }
+  }, [dispatch, vendorId, search, statusFilter, currentPage]);
 
 
+
+  // Handle delete product
   const handleDeleteProduct = async (productId) => {
     if (window.confirm('Are you sure you want to delete this product?')) {
       try {
         await dispatch(deleteProductAdmin(productId)).unwrap();
         // Refresh the products list
-        dispatch(fetchAllProducts({
-          page: currentPage,
-          limit: 10,
-          vendor: vendorId
+        dispatch(fetchVendorProducts({
+          vendorId,
+          params: {
+            page: currentPage,
+            limit: 10,
+            search,
+            status: statusFilter
+          }
         }));
       } catch (error) {
         console.error('Failed to delete product:', error);
       }
     }
   };
+
+  // Use vendorStats instead of local stats calculation
+  const stats = vendorStats;
 
   const getStatusBadge = (status) => {
     const badges = {

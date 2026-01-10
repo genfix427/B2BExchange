@@ -58,6 +58,8 @@ import { useLicenses } from '../../components/VendorDetails/hooks/useLicenses'
 import { useUtilities } from '../../components/VendorDetails/hooks/useUtilities'
 import { useIcons } from '../../components/VendorDetails/hooks/useIcons'
 
+import { fetchVendorProducts } from '../../store/slices/adminProductSlice'
+
 // Import date formatting
 import { format } from 'date-fns'
 
@@ -66,6 +68,8 @@ const VendorDetailPage = () => {
   const navigate = useNavigate()
   const dispatch = useDispatch()
   const { selectedVendor, isLoading, error } = useSelector((state) => state.vendors)
+  const { vendorProducts } = useSelector((state) => state.adminProducts)
+
 
   const [activeTab, setActiveTab] = useState('info')
 
@@ -122,6 +126,16 @@ const VendorDetailPage = () => {
       dispatch(fetchVendorDetails(id))
     }
   }, [dispatch, id])
+
+  useEffect(() => {
+  if (selectedVendor?._id) {
+    dispatch(fetchVendorProducts({ vendorId: selectedVendor._id }))
+  }
+}, [dispatch, selectedVendor?._id])
+
+// Or better: Create a utility function to get count from vendor data
+const getProductsCount = () => vendorProducts?.length ?? 0;
+
 
   if (isLoading) {
     return (
@@ -333,7 +347,7 @@ const VendorDetailPage = () => {
             { id: 'documents', label: 'Documents', icon: FileText, badge: documents.length },
             { id: 'licenses', label: 'Licenses', icon: Shield, badge: licenses.length },
             { id: 'contacts', label: 'Contacts', icon: UsersIcon },
-            { id: 'products', label: 'Products', icon: Package },
+            { id: 'products', label: 'Products', icon: Package, badge: getProductsCount() },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
             { id: 'analytics', label: 'Analytics', icon: BarChart },
             { id: 'history', label: 'History', icon: HistoryIcon }

@@ -14,6 +14,18 @@ export const fetchAllProducts = createAsyncThunk(
     }
 );
 
+export const fetchVendorProducts = createAsyncThunk(
+    'adminProducts/fetchVendorProducts',
+    async ({ vendorId, params = {} }, { rejectWithValue }) => {
+        try {
+            const response = await productService.getVendorProducts(vendorId, params);
+            return response;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to fetch vendor products');
+        }
+    }
+);
+
 export const fetchAdminProduct = createAsyncThunk(
     'adminProducts/fetchProduct',
     async (id, { rejectWithValue }) => {
@@ -65,10 +77,19 @@ export const fetchAdminProductStats = createAsyncThunk(
 // Initial state
 const initialState = {
     products: [],
+    vendorProducts: [], // Add this
     currentProduct: null,
     loading: false,
     error: null,
     success: false,
+    vendorStats: {  // Add vendor-specific stats
+        totalProducts: 0,
+        activeProducts: 0,
+        outOfStockProducts: 0,
+        totalStock: 0,
+        totalValue: 0,
+        avgPrice: 0
+    },
     stats: {
         totalProducts: 0,
         activeProducts: 0,
@@ -119,6 +140,22 @@ const adminProductSlice = createSlice({
             })
 
             .addCase(fetchAllProducts.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            // Fetch Vendor Products
+            .addCase(fetchVendorProducts.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(fetchVendorProducts.fulfilled, (state, action) => {
+                state.loading = false;
+                state.vendorProducts = action.payload?.data || [];
+                state.vendorStats = action.payload?.stats || state.vendorStats;
+                state.pagination = action.payload?.pagination || state.pagination;
+            })
+            .addCase(fetchVendorProducts.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })

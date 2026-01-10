@@ -124,6 +124,23 @@ const productSchema = new mongoose.Schema({
   updatedAt: {
     type: Date,
     default: Date.now
+  },
+
+   wishlistCount: {
+    type: Number,
+    default: 0
+  },
+  
+  // Add sales count
+  salesCount: {
+    type: Number,
+    default: 0
+  },
+  
+  // Add view count
+  viewCount: {
+    type: Number,
+    default: 0
   }
 }, {
   timestamps: true

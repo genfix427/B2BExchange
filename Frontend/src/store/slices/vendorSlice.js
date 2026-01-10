@@ -38,6 +38,42 @@ export const uploadDocument = createAsyncThunk(
   }
 )
 
+export const fetchVendorOrders = createAsyncThunk(
+  'vendor/fetchVendorOrders',
+  async (params = {}, { rejectWithValue }) => {
+    try {
+      const response = await vendorService.getVendorOrders(params);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch vendor orders');
+    }
+  }
+);
+
+export const updateOrderStatus = createAsyncThunk(
+  'vendor/updateOrderStatus',
+  async ({ orderId, status, trackingNumber }, { rejectWithValue }) => {
+    try {
+      const response = await vendorService.updateOrderStatus(orderId, { status, trackingNumber });
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to update order status');
+    }
+  }
+);
+
+export const fetchVendorOrderDetails = createAsyncThunk(
+  'vendor/fetchVendorOrderDetails',
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const response = await vendorService.getVendorOrderDetails(orderId);
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch order details');
+    }
+  }
+);
+
 const initialState = {
   profile: null,
   isLoading: false,
@@ -120,6 +156,52 @@ const vendorSlice = createSlice({
         state.isLoading = false
         state.error = action.payload
       })
+      // Fetch Vendor Orders
+      .addCase(fetchVendorOrders.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchVendorOrders.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.vendorOrders = action.payload.data || [];
+        state.pagination = action.payload.pagination || initialState.pagination;
+      })
+      .addCase(fetchVendorOrders.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+
+      // Update Order Status
+      .addCase(updateOrderStatus.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(updateOrderStatus.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const updatedOrder = action.payload;
+        const index = state.vendorOrders.findIndex(o => o._id === updatedOrder._id);
+        if (index !== -1) {
+          state.vendorOrders[index] = updatedOrder;
+        }
+      })
+      .addCase(updateOrderStatus.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      })
+
+      // Fetch Vendor Order Details
+      .addCase(fetchVendorOrderDetails.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(fetchVendorOrderDetails.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.currentVendorOrder = action.payload;
+      })
+      .addCase(fetchVendorOrderDetails.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
   }
 })
 

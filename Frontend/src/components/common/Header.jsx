@@ -33,17 +33,15 @@ export default function Header() {
   }, [userDropdownOpen])
 
   const navClass = ({ isActive }) =>
-    `transition-colors ${
-      isActive
-        ? 'text-teal-600 font-semibold border-b-2 border-teal-600'
-        : 'text-gray-700 hover:text-teal-600'
+    `transition-colors ${isActive
+      ? 'text-teal-600 font-semibold border-b-2 border-teal-600'
+      : 'text-gray-700 hover:text-teal-600'
     }`
 
   const mobileNavClass = ({ isActive }) =>
-    `block py-2 border-b transition ${
-      isActive
-        ? 'text-teal-600 font-semibold'
-        : 'text-gray-700 hover:text-teal-600'
+    `block py-2 border-b transition ${isActive
+      ? 'text-teal-600 font-semibold'
+      : 'text-gray-700 hover:text-teal-600'
     }`
 
   const handleLogout = async () => {
@@ -59,35 +57,35 @@ export default function Header() {
   // Get first letter of pharmacy name or email
   const getUserInitial = () => {
     if (!user) return 'U'
-    
+
     // Try to get pharmacy name from multiple possible locations
-    const pharmacyName = user.pharmacyInfo?.legalBusinessName || 
-                        user.businessName ||
-                        user.legalBusinessName
-    
+    const pharmacyName = user.pharmacyInfo?.legalBusinessName ||
+      user.businessName ||
+      user.legalBusinessName
+
     if (pharmacyName && pharmacyName.length > 0) {
       return pharmacyName.charAt(0).toUpperCase()
     }
-    
+
     if (user.email && user.email.length > 0) {
       return user.email.charAt(0).toUpperCase()
     }
-    
+
     return 'U'
   }
 
   // Get full pharmacy name
   const getPharmacyName = () => {
     if (!user) return ''
-    
-    const pharmacyName = user.pharmacyInfo?.legalBusinessName || 
-                        user.businessName ||
-                        user.legalBusinessName
-    
+
+    const pharmacyName = user.pharmacyInfo?.legalBusinessName ||
+      user.businessName ||
+      user.legalBusinessName
+
     if (pharmacyName) {
       return pharmacyName.length > 20 ? pharmacyName.substring(0, 20) + '...' : pharmacyName
     }
-    
+
     return user.email ? user.email.split('@')[0] : ''
   }
 
@@ -119,9 +117,8 @@ export default function Header() {
 
   return (
     <header
-      className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-        scrolled ? 'bg-white shadow-md' : 'bg-white'
-      }`}
+      className={`fixed top-0 w-full z-50 transition-all duration-300 ${scrolled ? 'bg-white shadow-md' : 'bg-white'
+        }`}
     >
       <div className="max-w-7xl mx-auto px-4">
         <div className="flex items-center justify-between h-16">
@@ -169,24 +166,24 @@ export default function Header() {
                   <div className="w-10 h-10 rounded-full bg-teal-600 text-white flex items-center justify-center font-semibold text-lg">
                     {getUserInitial()}
                   </div>
-                  
+
                   {/* Pharmacy Name */}
                   <div className="text-left">
                     <p className="font-medium text-gray-900 text-sm">
                       {getPharmacyName()}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {user.status === 'approved' ? 'Active Vendor' : 
-                       user.status === 'pending' ? 'Pending Approval' : 
-                       user.status === 'rejected' ? 'Rejected' : 'Vendor'}
+                      {user.status === 'approved' ? 'Active Vendor' :
+                        user.status === 'pending' ? 'Pending Approval' :
+                          user.status === 'rejected' ? 'Rejected' : 'Vendor'}
                     </p>
                   </div>
-                  
+
                   {/* Dropdown Arrow */}
-                  <svg 
-                    className={`w-4 h-4 text-gray-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`} 
-                    fill="none" 
-                    stroke="currentColor" 
+                  <svg
+                    className={`w-4 h-4 text-gray-400 transition-transform ${userDropdownOpen ? 'rotate-180' : ''}`}
+                    fill="none"
+                    stroke="currentColor"
                     viewBox="0 0 24 24"
                   >
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -205,16 +202,15 @@ export default function Header() {
                         {getUserEmail()}
                       </p>
                       <div className="mt-2">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                          user.status === 'approved' ? 'bg-green-100 text-green-800' :
-                          user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          user.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${user.status === 'approved' ? 'bg-green-100 text-green-800' :
+                            user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              user.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-800'
+                          }`}>
                           {user.status === 'approved' ? '✓ Approved' :
-                           user.status === 'pending' ? '⏳ Pending' :
-                           user.status === 'rejected' ? '✗ Rejected' :
-                           user.status}
+                            user.status === 'pending' ? '⏳ Pending' :
+                              user.status === 'rejected' ? '✗ Rejected' :
+                                user.status}
                         </span>
                       </div>
                     </div>
@@ -312,9 +308,8 @@ export default function Header() {
 
       {/* Mobile Menu */}
       <div
-        className={`lg:hidden overflow-hidden transition-all duration-300 ${
-          open ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
-        }`}
+        className={`lg:hidden overflow-hidden transition-all duration-300 ${open ? 'max-h-screen opacity-100' : 'max-h-0 opacity-0'
+          }`}
       >
         <div className="px-4 pb-4 space-y-3 bg-white">
           {/* Navigation Links */}
@@ -353,16 +348,15 @@ export default function Header() {
                     {getUserEmail()}
                   </p>
                   <div className="mt-1">
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                      user.status === 'approved' ? 'bg-green-100 text-green-800' :
-                      user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      user.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${user.status === 'approved' ? 'bg-green-100 text-green-800' :
+                        user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          user.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                            'bg-gray-100 text-gray-800'
+                      }`}>
                       {user.status === 'approved' ? '✓ Approved' :
-                       user.status === 'pending' ? '⏳ Pending' :
-                       user.status === 'rejected' ? '✗ Rejected' :
-                       user.status}
+                        user.status === 'pending' ? '⏳ Pending' :
+                          user.status === 'rejected' ? '✗ Rejected' :
+                            user.status}
                     </span>
                   </div>
                 </div>

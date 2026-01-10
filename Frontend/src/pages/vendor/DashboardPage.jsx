@@ -1,7 +1,6 @@
-import React, { useEffect } from 'react'
-import { useSelector, useDispatch } from 'react-redux'
-import { Link } from 'react-router-dom'
-import { format } from 'date-fns'
+import React, { useEffect, useState } from 'react';
+import { useSelector, useDispatch } from 'react-redux';
+import { Link } from 'react-router-dom';
 import { 
   Package,
   DollarSign,
@@ -16,183 +15,164 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Eye,
-  Edit2,
-  Trash2,
   Plus,
   TrendingDown,
   Box,
   Thermometer,
-  Hash
-} from 'lucide-react'
-import { setStats } from '../../store/slices/vendorSlice'
-import { fetchVendorProducts, fetchProductStats } from '../../store/slices/vendorProductSlice'
+  Hash,
+  Truck,
+  User,
+  MessageSquare,
+  FileText
+} from 'lucide-react';
+import { setStats } from '../../store/slices/vendorSlice';
+import { 
+  fetchVendorProducts, 
+  fetchProductStats 
+} from '../../store/slices/vendorProductSlice';
+import { 
+  fetchVendorOrders 
+} from '../../store/slices/storeSlice';
+import StatCard from '../../components/dashboard/StatCard';
+import ProductItem from '../../components/dashboard/ProductItem';
+import OrderItem from '../../components/dashboard/OrderItem';
+import RecentActivityItem from '../../components/dashboard/RecentActivityItem';
+import QuickActionCard from '../../components/dashboard/QuickActionCard';
 
 const DashboardPage = () => {
-  const dispatch = useDispatch()
-  const { user } = useSelector((state) => state.auth)
-  const { stats: vendorStats } = useSelector((state) => state.vendor)
-  const { products, stats: productStats, loading } = useSelector((state) => state.vendorProducts)
+  const dispatch = useDispatch();
+  const { user } = useSelector((state) => state.auth);
+  const { stats: vendorStats } = useSelector((state) => state.vendor);
+  const { products, stats: productStats, loading: productsLoading } = useSelector((state) => state.vendorProducts);
+  const { vendorOrders, loading: ordersLoading } = useSelector((state) => state.store);
+  
+  const [loading, setLoading] = useState(true);
+  const [orderStats, setOrderStats] = useState({
+    totalOrders: 0,
+    pendingOrders: 0,
+    completedOrders: 0,
+    totalRevenue: 0,
+    avgOrderValue: 0
+  });
+  const [recentActivities, setRecentActivities] = useState([]);
 
   useEffect(() => {
-    // Fetch vendor products and stats
-    dispatch(fetchVendorProducts({ limit: 5 }))
-    dispatch(fetchProductStats())
+    const loadDashboardData = async () => {
+      setLoading(true);
+      
+      try {
+        // Fetch all dashboard data
+        await Promise.all([
+          dispatch(fetchVendorProducts({ limit: 5 })),
+          dispatch(fetchProductStats()),
+          dispatch(fetchVendorOrders({ limit: 5 }))
+        ]);
+        
+        // Calculate order stats
+        if (vendorOrders && vendorOrders.length > 0) {
+          const total = vendorOrders.length;
+          const pending = vendorOrders.filter(o => o.status === 'pending').length;
+          const completed = vendorOrders.filter(o => ['delivered', 'shipped'].includes(o.status)).length;
+          const revenue = vendorOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+          const avgValue = revenue / total;
+          
+          setOrderStats({
+            totalOrders: total,
+            pendingOrders: pending,
+            completedOrders: completed,
+            totalRevenue: revenue,
+            avgOrderValue: avgValue
+          });
+        }
+        
+        // Generate recent activities
+        generateRecentActivities();
+        
+        // Set vendor stats
+        dispatch(setStats({
+          totalOrders: vendorOrders?.length || 0,
+          pendingOrders: vendorOrders?.filter(o => o.status === 'pending').length || 0,
+          completedOrders: vendorOrders?.filter(o => ['delivered', 'shipped'].includes(o.status)).length || 0,
+          totalRevenue: `$${vendorOrders?.reduce((sum, o) => sum + (o.total || 0), 0)?.toLocaleString() || '0'}`,
+          activeListings: productStats?.activeProducts || 0,
+          conversionRate: '12.5%',
+          monthlyGrowth: '+8.2%',
+          customerRating: '4.8/5.0'
+        }));
+      } catch (error) {
+        console.error('Error loading dashboard data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    // Mock data for other stats
-    const mockStats = {
-      totalOrders: 156,
-      pendingOrders: 12,
-      completedOrders: 144,
-      totalRevenue: '$45,820',
-      activeListings: 89,
-      conversionRate: '12.5%',
-      monthlyGrowth: '+8.2%',
-      customerRating: '4.8/5.0'
+    loadDashboardData();
+  }, [dispatch]);
+
+  const generateRecentActivities = () => {
+    const activities = [];
+    
+    // Add recent products as activities
+    products.slice(0, 3).forEach(product => {
+      activities.push({
+        type: 'product_added',
+        message: `New product added: ${product.productName}`,
+        createdAt: product.createdAt
+      });
+    });
+    
+    // Add recent orders as activities
+    if (vendorOrders && vendorOrders.length > 0) {
+      vendorOrders.slice(0, 3).forEach(order => {
+        activities.push({
+          type: 'order_received',
+          message: `New order received: #${order.orderNumber || order._id?.substring(0, 8)}`,
+          createdAt: order.createdAt
+        });
+      });
     }
-    dispatch(setStats(mockStats))
-  }, [dispatch])
+    
+    // Sort by date (newest first)
+    activities.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    
+    // Take only latest 5 activities
+    setRecentActivities(activities.slice(0, 5));
+  };
 
   // Get recent products (last 5)
-  const recentProducts = products.slice(0, 5)
-
-  const StatCard = ({ title, value, icon: Icon, change, trend = 'up', loading }) => (
-    <div className="bg-white overflow-hidden shadow rounded-lg">
-      <div className="p-5">
-        <div className="flex items-center">
-          <div className="flex-shrink-0">
-            <div className="p-3 rounded-md bg-blue-100">
-              <Icon className="h-6 w-6 text-blue-600" />
-            </div>
-          </div>
-          <div className="ml-5 w-0 flex-1">
-            <dl>
-              <dt className="text-sm font-medium text-gray-500 truncate">{title}</dt>
-              <dd className="text-lg font-semibold text-gray-900">
-                {loading ? '...' : value}
-              </dd>
-              {change && (
-                <dd className="text-sm">
-                  <span className={`inline-flex items-center ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                    {trend === 'up' ? (
-                      <ArrowUpRight className="h-4 w-4 mr-1" />
-                    ) : (
-                      <ArrowDownRight className="h-4 w-4 mr-1" />
-                    )}
-                    {change}
-                  </span>
-                  <span className="text-gray-500 ml-2">from last month</span>
-                </dd>
-              )}
-            </dl>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-
-  const QuickAction = ({ title, description, icon: Icon, color, to }) => (
-    <Link
-      to={to}
-      className="block p-4 bg-white rounded-lg border border-gray-200 hover:shadow-md transition-shadow"
-    >
-      <div className="flex items-center">
-        <div className={`flex-shrink-0 p-2 rounded-md ${color}`}>
-          <Icon className="h-5 w-5 text-white" />
-        </div>
-        <div className="ml-4">
-          <h3 className="text-sm font-medium text-gray-900">{title}</h3>
-          <p className="text-sm text-gray-500">{description}</p>
-        </div>
-      </div>
-    </Link>
-  )
-
-  const ProductItem = ({ product }) => {
-    const getStatusColor = (status) => {
-      switch(status) {
-        case 'active':
-          return 'bg-green-100 text-green-800'
-        case 'out_of_stock':
-          return 'bg-red-100 text-red-800'
-        default:
-          return 'bg-gray-100 text-gray-800'
-      }
-    }
-
-    const formatPrice = (price) => {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-      }).format(price)
-    }
-
-    const isExpired = (expirationDate) => {
-      return new Date(expirationDate) < new Date()
-    }
-
-    return (
-      <div className="flex items-center justify-between py-3 border-b border-gray-200 last:border-0">
-        <div className="flex items-center">
-          {product.image?.url ? (
-            <img
-              src={product.image.url}
-              alt={product.productName}
-              className="h-10 w-10 rounded object-cover mr-3"
-            />
-          ) : (
-            <div className="h-10 w-10 bg-gray-200 rounded flex items-center justify-center mr-3">
-              <Package className="h-5 w-5 text-gray-400" />
-            </div>
-          )}
-          <div>
-            <p className="text-sm font-medium text-gray-900 truncate max-w-xs">
-              {product.productName}
-            </p>
-            <div className="flex items-center mt-1 space-x-2">
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${getStatusColor(product.status)}`}>
-                {product.status === 'active' ? (
-                  <CheckCircle className="h-3 w-3 mr-1" />
-                ) : (
-                  <AlertCircle className="h-3 w-3 mr-1" />
-                )}
-                {product.status.replace('_', ' ')}
-              </span>
-              <span className="text-xs text-gray-500">
-                Stock: {product.quantityInStock}
-              </span>
-            </div>
-          </div>
-        </div>
-        <div className="text-right">
-          <p className="text-sm font-medium text-gray-900">
-            {formatPrice(product.price)}
-          </p>
-          <p className={`text-xs ${isExpired(product.expirationDate) ? 'text-red-600' : 'text-gray-500'}`}>
-            {isExpired(product.expirationDate) ? 'Expired' : 'Valid'}
-          </p>
-        </div>
-      </div>
-    )
-  }
+  const recentProducts = products.slice(0, 5);
+  
+  // Get recent orders (last 5)
+  const recentOrders = vendorOrders?.slice(0, 5) || [];
 
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">
-          Welcome back, {user?.pharmacyOwner?.firstName}!
-        </h1>
-        <p className="mt-1 text-sm text-gray-600">
-          Here's what's happening with your pharmacy today.
-        </p>
+      <div className="bg-white rounded-lg shadow p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">
+              Welcome back, {user?.pharmacyOwner?.firstName}!
+            </h1>
+            <p className="mt-1 text-sm text-gray-600">
+              Here's what's happening with your pharmacy today.
+            </p>
+          </div>
+          <div className="mt-4 md:mt-0">
+            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+              <CheckCircle className="h-4 w-4 mr-1" />
+              Account Active
+            </span>
+          </div>
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -203,23 +183,66 @@ const DashboardPage = () => {
           icon={Package}
           change={productStats.totalProducts > 0 ? '+8.2%' : ''}
           trend="up"
-          loading={loading}
+          loading={productsLoading}
+          color="blue"
         />
+        <StatCard
+          title="Total Orders"
+          value={orderStats.totalOrders || 0}
+          icon={ShoppingBag}
+          change={orderStats.totalOrders > 0 ? '+12.5%' : ''}
+          trend="up"
+          loading={ordersLoading}
+          color="green"
+        />
+        <StatCard
+          title="Pending Orders"
+          value={orderStats.pendingOrders || 0}
+          icon={Clock}
+          change={orderStats.pendingOrders > 0 ? '+3.1%' : ''}
+          trend="up"
+          loading={ordersLoading}
+          color="yellow"
+        />
+        <StatCard
+          title="Total Revenue"
+          value={`$${orderStats.totalRevenue?.toLocaleString() || '0'}`}
+          icon={DollarSign}
+          change="+15.8%"
+          trend="up"
+          loading={ordersLoading}
+          color="purple"
+        />
+      </div>
+
+      {/* Second Stats Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
         <StatCard
           title="Active Products"
           value={productStats.activeProducts || 0}
           icon={CheckCircle}
           change={productStats.activeProducts > 0 ? '+5.1%' : ''}
           trend="up"
-          loading={loading}
+          loading={productsLoading}
+          color="green"
         />
         <StatCard
-          title="Total Stock Value"
-          value={`$${productStats.totalValue?.toLocaleString() || '0'}`}
-          icon={DollarSign}
-          change="+12.5%"
+          title="Completed Orders"
+          value={orderStats.completedOrders || 0}
+          icon={Truck}
+          change={orderStats.completedOrders > 0 ? '+18.2%' : ''}
           trend="up"
-          loading={loading}
+          loading={ordersLoading}
+          color="indigo"
+        />
+        <StatCard
+          title="Avg Order Value"
+          value={`$${orderStats.avgOrderValue?.toFixed(2) || '0.00'}`}
+          icon={BarChart3}
+          change="+7.3%"
+          trend="up"
+          loading={ordersLoading}
+          color="blue"
         />
         <StatCard
           title="Out of Stock"
@@ -227,13 +250,14 @@ const DashboardPage = () => {
           icon={AlertCircle}
           change={productStats.outOfStockProducts > 0 ? '-2.1%' : ''}
           trend="down"
-          loading={loading}
+          loading={productsLoading}
+          color="red"
         />
       </div>
 
       {/* Main Content */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Recent Products & Quick Actions */}
+        {/* Left Column - Recent Products & Recent Orders */}
         <div className="lg:col-span-2 space-y-6">
           {/* Recent Products */}
           <div className="bg-white shadow rounded-lg p-6">
@@ -280,190 +304,145 @@ const DashboardPage = () => {
             )}
           </div>
 
-          {/* Quick Actions */}
+          {/* Recent Orders */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Link to="/vendor/products">
-                <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-purple-100 rounded-lg">
-                      <Package className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-600">Manage Products</p>
-                      <p className="text-xl font-bold text-gray-900">{productStats.totalProducts || 0}</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-              
-              <Link to="/vendor/products/create">
-                <div className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
-                  <div className="flex flex-col items-center justify-center h-full">
-                    <div className="p-2 bg-blue-100 rounded-lg mb-2">
-                      <Plus className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <p className="text-sm font-medium text-gray-900">Add New Product</p>
-                    <p className="text-xs text-gray-500 mt-1">Create new listing</p>
-                  </div>
-                </div>
-              </Link>
-
-              <Link to="/vendor/orders">
-                <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-green-100 rounded-lg">
-                      <ShoppingBag className="w-5 h-5 text-green-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">Manage Orders</p>
-                      <p className="text-sm text-gray-500">Process pending orders</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
-
-              <Link to="/vendor/profile">
-                <div className="bg-white rounded-lg border border-gray-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-center">
-                    <div className="p-2 bg-yellow-100 rounded-lg">
-                      <Users className="w-5 h-5 text-yellow-600" />
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm font-medium text-gray-900">Update Profile</p>
-                      <p className="text-sm text-gray-500">Edit pharmacy information</p>
-                    </div>
-                  </div>
-                </div>
-              </Link>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-medium text-gray-900">Recent Orders</h2>
+              <div className="flex items-center space-x-3">
+                <Link 
+                  to="/vendor/orders" 
+                  className="text-sm font-medium text-blue-600 hover:text-blue-500"
+                >
+                  View all
+                </Link>
+                <Link 
+                  to="/vendor/orders"
+                  className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200"
+                >
+                  <Eye className="h-4 w-4 mr-1" />
+                  Manage Orders
+                </Link>
+              </div>
             </div>
+            
+            {recentOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <ShoppingBag className="mx-auto h-12 w-12 text-gray-400" />
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No orders yet</h3>
+                <p className="mt-1 text-sm text-gray-500">
+                  When customers purchase your products, they'll appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-gray-200">
+                {recentOrders.map((order) => (
+                  <OrderItem key={order._id} order={order} />
+                ))}
+              </div>
+            )}
           </div>
 
-          {/* Inventory Summary */}
+          {/* Quick Actions Grid */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Inventory Summary</h2>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-gray-900">{productStats.totalProducts || 0}</div>
-                <div className="text-sm text-gray-600 mt-1">Total Products</div>
-              </div>
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-green-600">{productStats.activeProducts || 0}</div>
-                <div className="text-sm text-gray-600 mt-1">Active</div>
-              </div>
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-red-600">{productStats.outOfStockProducts || 0}</div>
-                <div className="text-sm text-gray-600 mt-1">Out of Stock</div>
-              </div>
-              <div className="text-center p-4 border border-gray-200 rounded-lg">
-                <div className="text-2xl font-bold text-blue-600">{productStats.totalStock || 0}</div>
-                <div className="text-sm text-gray-600 mt-1">Total Units</div>
-              </div>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <QuickActionCard
+                title="Add Product"
+                description="Create new listing"
+                icon={Plus}
+                color="blue"
+                to="/vendor/products/create"
+              />
+              <QuickActionCard
+                title="Manage Orders"
+                description="Process pending orders"
+                icon={ShoppingBag}
+                color="green"
+                to="/vendor/orders"
+              />
+              <QuickActionCard
+                title="View Reports"
+                description="Sales analytics"
+                icon={BarChart3}
+                color="purple"
+                to="/vendor/reports"
+              />
+              <QuickActionCard
+                title="Update Profile"
+                description="Edit pharmacy info"
+                icon={User}
+                color="indigo"
+                to="/vendor/profile"
+              />
             </div>
           </div>
         </div>
 
-        {/* Right Column - Recent Activity & Calendar */}
+        {/* Right Column - Recent Activity & Stats */}
         <div className="space-y-6">
           {/* Recent Activity */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h2>
-            <div className="space-y-4">
-              {recentProducts.length > 0 && recentProducts.slice(0, 3).map((product, index) => (
-                <div key={product._id} className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <div className="p-1 rounded-full bg-blue-100">
-                      <Package className="h-5 w-5 text-blue-600" />
-                    </div>
-                  </div>
-                  <div className="ml-3">
-                    <p className="text-sm text-gray-900">
-                      New product added: {product.productName}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {format(new Date(product.createdAt), 'MMM d, yyyy')}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              
-              {recentProducts.length === 0 && (
-                <>
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <div className="p-1 rounded-full bg-green-100">
-                        <CheckCircle className="h-5 w-5 text-green-600" />
-                      </div>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-gray-900">Account approved</p>
-                      <p className="text-xs text-gray-500">Welcome to the platform</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start">
-                    <div className="flex-shrink-0">
-                      <div className="p-1 rounded-full bg-yellow-100">
-                        <Clock className="h-5 w-5 text-yellow-600" />
-                      </div>
-                    </div>
-                    <div className="ml-3">
-                      <p className="text-sm text-gray-900">Profile setup completed</p>
-                      <p className="text-xs text-gray-500">Your pharmacy is ready</p>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
-
-          {/* Calendar */}
-          <div className="bg-white shadow rounded-lg p-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-medium text-gray-900">Upcoming</h2>
-              <Calendar className="h-5 w-5 text-gray-400" />
+              <h2 className="text-lg font-medium text-gray-900">Recent Activity</h2>
+              <Link 
+                to="/vendor/activity" 
+                className="text-sm text-blue-600 hover:text-blue-800"
+              >
+                View all
+              </Link>
             </div>
-            <div className="space-y-3">
-              {/* Check for expiring products */}
-              {recentProducts.filter(p => {
-                const expDate = new Date(p.expirationDate)
-                const daysToExpire = Math.ceil((expDate - new Date()) / (1000 * 60 * 60 * 24))
-                return daysToExpire <= 60 && daysToExpire > 0
-              }).slice(0, 3).map(product => (
-                <div key={product._id} className="flex items-center">
-                  <div className="flex-shrink-0 w-2 h-2 rounded-full bg-red-500"></div>
-                  <div className="ml-3">
-                    <p className="text-sm text-gray-900 truncate">{product.productName}</p>
-                    <p className="text-xs text-red-500">
-                      Expires in {Math.ceil((new Date(product.expirationDate) - new Date()) / (1000 * 60 * 60 * 24))} days
-                    </p>
-                  </div>
+            
+            <div className="space-y-4">
+              {recentActivities.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">No recent activity</p>
                 </div>
-              ))}
-              
-              {/* Default reminders if no expiring products */}
-              {recentProducts.length === 0 && (
-                <>
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-blue-500"></div>
-                    <div className="ml-3">
-                      <p className="text-sm text-gray-900">Add your first product</p>
-                      <p className="text-xs text-gray-500">Get started with inventory</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0 w-2 h-2 rounded-full bg-green-500"></div>
-                    <div className="ml-3">
-                      <p className="text-sm text-gray-900">Setup payment method</p>
-                      <p className="text-xs text-gray-500">Required for transactions</p>
-                    </div>
-                  </div>
-                </>
+              ) : (
+                recentActivities.map((activity, index) => (
+                  <RecentActivityItem key={index} activity={activity} />
+                ))
               )}
             </div>
           </div>
 
-          {/* Performance Summary */}
+          {/* Order Summary */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Order Summary</h2>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Total Orders</span>
+                <span className="text-sm font-medium text-gray-900">
+                  {orderStats.totalOrders}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Pending</span>
+                <span className="text-sm font-medium text-yellow-600">
+                  {orderStats.pendingOrders}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Processing</span>
+                <span className="text-sm font-medium text-blue-600">
+                  {vendorOrders?.filter(o => o.status === 'processing').length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Shipped</span>
+                <span className="text-sm font-medium text-green-600">
+                  {vendorOrders?.filter(o => o.status === 'shipped').length || 0}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Delivered</span>
+                <span className="text-sm font-medium text-emerald-600">
+                  {vendorOrders?.filter(o => o.status === 'delivered').length || 0}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Inventory Health */}
           <div className="bg-white shadow rounded-lg p-6">
             <h2 className="text-lg font-medium text-gray-900 mb-4">Inventory Health</h2>
             <div className="space-y-3">
@@ -474,15 +453,7 @@ const DashboardPage = () => {
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Average Price</span>
-                <span className="text-sm font-medium text-gray-900">
-                  ${productStats.totalValue && productStats.totalProducts 
-                    ? (productStats.totalValue / productStats.totalProducts).toFixed(2)
-                    : '0.00'}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Stock Ratio</span>
+                <span className="text-sm text-gray-600">Active Rate</span>
                 <span className="text-sm font-medium text-green-600">
                   {productStats.totalProducts 
                     ? ((productStats.activeProducts / productStats.totalProducts) * 100).toFixed(1) + '%'
@@ -490,9 +461,15 @@ const DashboardPage = () => {
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Low Stock Alert</span>
+                <span className="text-sm text-gray-600">Low Stock</span>
                 <span className="text-sm font-medium text-red-600">
-                  {recentProducts.filter(p => p.quantityInStock <= 10).length}
+                  {products.filter(p => p.quantityInStock <= 10 && p.quantityInStock > 0).length}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Out of Stock</span>
+                <span className="text-sm font-medium text-red-600">
+                  {productStats.outOfStockProducts || 0}
                 </span>
               </div>
             </div>
@@ -505,34 +482,89 @@ const DashboardPage = () => {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center">
                   <Box className="w-4 h-4 mr-2 text-gray-400" />
-                  Total Units in Stock
+                  Total Units
                 </span>
                 <span className="font-medium">{productStats.totalStock || 0}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center">
                   <Thermometer className="w-4 h-4 mr-2 text-gray-400" />
-                  Fridge Products
+                  Fridge Items
                 </span>
                 <span className="font-medium">
-                  {recentProducts.filter(p => p.isFridgeProduct === 'Yes').length}
+                  {products.filter(p => p.isFridgeProduct === 'Yes').length}
                 </span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600 flex items-center">
                   <Hash className="w-4 h-4 mr-2 text-gray-400" />
-                  Unique Manufacturers
+                  Manufacturers
                 </span>
                 <span className="font-medium">
-                  {[...new Set(recentProducts.map(p => p.manufacturer))].length}
+                  {[...new Set(products.map(p => p.manufacturer))].length}
                 </span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-gray-600 flex items-center">
+                  <MessageSquare className="w-4 h-4 mr-2 text-gray-400" />
+                  Customer Messages
+                </span>
+                <span className="font-medium">0</span>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
-  )
-}
 
-export default DashboardPage
+      {/* Bottom Row - Inventory Summary */}
+      <div className="bg-white shadow rounded-lg p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-medium text-gray-900">Inventory Summary</h2>
+          <Link 
+            to="/vendor/products" 
+            className="text-sm text-blue-600 hover:text-blue-800 flex items-center"
+          >
+            <FileText className="h-4 w-4 mr-1" />
+            Export Report
+          </Link>
+        </div>
+        
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center p-4 border border-gray-200 rounded-lg">
+            <div className="text-2xl font-bold text-gray-900">{productStats.totalProducts || 0}</div>
+            <div className="text-sm text-gray-600 mt-1">Total Products</div>
+          </div>
+          <div className="text-center p-4 border border-gray-200 rounded-lg">
+            <div className="text-2xl font-bold text-green-600">{productStats.activeProducts || 0}</div>
+            <div className="text-sm text-gray-600 mt-1">Active</div>
+          </div>
+          <div className="text-center p-4 border border-gray-200 rounded-lg">
+            <div className="text-2xl font-bold text-red-600">{productStats.outOfStockProducts || 0}</div>
+            <div className="text-sm text-gray-600 mt-1">Out of Stock</div>
+          </div>
+          <div className="text-center p-4 border border-gray-200 rounded-lg">
+            <div className="text-2xl font-bold text-blue-600">{productStats.totalStock || 0}</div>
+            <div className="text-sm text-gray-600 mt-1">Total Units</div>
+          </div>
+        </div>
+        
+        {/* Product Categories */}
+        <div className="mt-6">
+          <h3 className="text-sm font-medium text-gray-900 mb-3">Product Categories</h3>
+          <div className="flex flex-wrap gap-2">
+            {[...new Set(products.map(p => p.dosageForm))].slice(0, 6).map((category, index) => (
+              <span 
+                key={index} 
+                className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800"
+              >
+                {category || 'Uncategorized'}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default DashboardPage;

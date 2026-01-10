@@ -29,5 +29,25 @@ export const vendorService = {
   async getStats() {
     const response = await api.get('/vendors/stats')
     return response.data
+  },
+
+  async getVendorOrders(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return api.get(`/vendor/orders${query ? `?${query}` : ''}`);
+  },
+
+  // Update order status
+  async updateOrderStatus(orderId, data) {
+    return api.put(`/vendor/orders/${orderId}/status`, data);
+  },
+
+  // Get vendor order details
+  async getVendorOrderDetails(orderId) {
+    return api.get(`/vendor/orders/${orderId}`);
+  },
+
+  // Get vendor dashboard stats
+  async getVendorStats() {
+    return api.get('/vendor/stats');
   }
 }

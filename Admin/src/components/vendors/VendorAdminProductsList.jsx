@@ -40,19 +40,24 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
 
   // Fetch products for this vendor
   useEffect(() => {
-    if (vendorId) {
-      dispatch(fetchAllProducts({
-        page: currentPage,
-        limit: 10,
-        search,
-        vendor: vendorId,
-        status: statusFilter
-      }));
-    }
-  }, [dispatch, vendorId, search, statusFilter, currentPage]);
+  if (vendorId) {
+    dispatch(fetchAllProducts({
+      page: currentPage,
+      limit: 10,
+      search,
+      vendor: vendorId,
+      status: statusFilter
+    }));
+  }
+}, [dispatch, vendorId, search, statusFilter, currentPage]);
 
-  // Calculate vendor-specific stats
-  useEffect(() => {
+// 2️⃣ Sync redux → local vendorProducts ✅ FIX
+useEffect(() => {
+  setVendorProducts(products || []);
+}, [products]);
+
+// 3️⃣ Calculate stats
+useEffect(() => {
   const totalProducts = vendorProducts.length;
   const activeProducts = vendorProducts.filter(p => p.status === 'active').length;
   const outOfStockProducts = vendorProducts.filter(p => p.status === 'out_of_stock').length;

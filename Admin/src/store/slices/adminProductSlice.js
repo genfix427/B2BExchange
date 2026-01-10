@@ -111,22 +111,18 @@ const adminProductSlice = createSlice({
                 state.loading = true;
                 state.error = null;
             })
+
             .addCase(fetchAllProducts.fulfilled, (state, action) => {
                 state.loading = false;
-
-                // ✅ HANDLE BOTH RESPONSE TYPES SAFELY
-                if (Array.isArray(action.payload.data)) {
-                    state.products = action.payload.data;
-                } else {
-                    state.products = action.payload.data?.products || [];
-                    state.pagination = action.payload.data?.pagination || action.payload.pagination || state.pagination;
-                }
+                state.products = action.payload?.data || [];
+                state.pagination = action.payload?.pagination || state.pagination;
             })
 
             .addCase(fetchAllProducts.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
             })
+
 
             // Fetch Single Product
             .addCase(fetchAdminProduct.pending, (state) => {

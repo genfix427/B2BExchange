@@ -22,7 +22,14 @@ import profileRoutes from './routes/profile.routes.js';
 import adminAuthRoutes from './routes/adminAuth.routes.js';
 
 import vendorProductRoutes from './routes/vendor/product.routes.js';
+import storeProductRoutes from './routes/store/product.routes.js';
 import adminProductRoutes from './routes/admin/product.routes.js';
+
+import cartRoutes from './routes/store/cart.routes.js';
+import wishlistRoutes from './routes/store/wishlist.routes.js';
+import orderRoutes from './routes/store/order.routes.js';
+import vendorOrderRoutes from './routes/vendor/order.routes.js';
+import checkoutRoutes from './routes/store/checkout.routes.js';
 
 // Import middleware
 import errorHandler from './middleware/error.middleware.js';
@@ -99,7 +106,14 @@ app.use('/api/admin', authLimiter);
 app.use('/api/admin/auth', adminAuthRoutes);
 
 app.use('/api/vendor/products', vendorProductRoutes);
+app.use('/api/store/products', storeProductRoutes);
 app.use('/api/admin/products', adminProductRoutes);
+
+app.use('/api/store/cart', cartRoutes);
+app.use('/api/store/wishlist', wishlistRoutes);
+app.use('/api/store/orders', orderRoutes);
+app.use('/api/vendor/orders', vendorOrderRoutes);
+app.use('/api/store/checkout', checkoutRoutes);
 
 /* =========================
    STATIC FILES

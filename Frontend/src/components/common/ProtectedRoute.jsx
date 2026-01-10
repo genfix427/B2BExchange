@@ -1,9 +1,9 @@
 import React from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useSelector } from 'react-redux'
-import LoadingSpinner from '../common/LoadingSpinner' // adjust path if needed
+import LoadingSpinner from '../common/LoadingSpinner'
 
-const ProtectedRoute = ({ children }) => {
+const ProtectedRoute = ({ children, requireApprovedVendor = true }) => {
   const location = useLocation()
   const { isAuthenticated, isLoading, user } = useSelector(
     (state) => state.auth
@@ -29,26 +29,29 @@ const ProtectedRoute = ({ children }) => {
     )
   }
 
-  // ❌ Wrong role
-  if (user.role !== 'vendor') {
-    return <Navigate to="/login" replace />
-  }
+  // If route requires vendor role
+  if (requireApprovedVendor) {
+    // ❌ Wrong role
+    if (user.role !== 'vendor') {
+      return <Navigate to="/login" replace />
+    }
 
-  // ❌ Vendor exists but not approved
-  if (user.status !== 'approved') {
-    switch (user.status) {
-      case 'pending':
-        return <Navigate to="/pending-approval" replace />
-      case 'rejected':
-        return <Navigate to="/account-rejected" replace />
-      case 'suspended':
-        return <Navigate to="/account-suspended" replace />
-      default:
-        return <Navigate to="/login" replace />
+    // ❌ Vendor exists but not approved
+    if (user.status !== 'approved') {
+      switch (user.status) {
+        case 'pending':
+          return <Navigate to="/pending-approval" replace />
+        case 'rejected':
+          return <Navigate to="/account-rejected" replace />
+        case 'suspended':
+          return <Navigate to="/account-suspended" replace />
+        default:
+          return <Navigate to="/login" replace />
+      }
     }
   }
 
-  // ✅ Approved vendor → allow access
+  // ✅ Approved vendor or any authenticated user → allow access
   return children
 }
 

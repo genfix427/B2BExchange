@@ -1,125 +1,94 @@
-// src/services/api.js - UPDATED to work with vendor auth
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL
+// src/services/api.js
 
-// ✅ Get token from vendor storage
-const getToken = () => {
-  if (typeof window !== 'undefined') {
-    // First check for vendor data
-    const vendorUser = localStorage.getItem('vendorUser')
-    if (vendorUser) {
-      try {
-        const vendorData = JSON.parse(vendorUser)
-        return vendorData.token // Your backend might send token in response.data
-      } catch (error) {
-        console.error('Error parsing vendorUser:', error)
-      }
-    }
-    // Fallback to regular token
-    return localStorage.getItem('token')
-  }
-  return null
-}
+// REQUIRED ENV (Render):
+// VITE_API_BASE_URL=https://b2bexchange-backend.onrender.com/api
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// ✅ Get vendor ID from storage
-const getVendorId = () => {
-  if (typeof window !== 'undefined') {
-    const vendorUser = localStorage.getItem('vendorUser')
-    if (vendorUser) {
-      try {
-        const vendorData = JSON.parse(vendorUser)
-        return vendorData._id || vendorData.id
-      } catch (error) {
-        console.error('Error parsing vendorUser:', error)
-      }
-    }
-    return localStorage.getItem('vendorId')
-  }
-  return null
-}
-
-// ✅ Get full vendor data
-const getVendorData = () => {
-  if (typeof window !== 'undefined') {
-    const vendorUser = localStorage.getItem('vendorUser')
-    if (vendorUser) {
-      try {
-        return JSON.parse(vendorUser)
-      } catch (error) {
-        console.error('Error parsing vendorUser:', error)
-      }
-    }
-  }
-  return null
-}
+console.log('🌍 VENDOR API_BASE_URL:', API_BASE_URL);
 
 export class ApiError extends Error {
   constructor(message, statusCode, data = null) {
-    super(message)
-    this.name = 'ApiError'
-    this.statusCode = statusCode
-    this.data = data
+    super(message);
+    this.name = 'ApiError';
+    this.statusCode = statusCode;
+    this.data = data;
   }
 }
 
 export const api = {
   async request(endpoint, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`
-    
-    // ✅ Get vendor token
-    const token = getToken()
-    const vendorData = getVendorData()
+    if (!API_BASE_URL) {
+      throw new ApiError('API base URL is not defined', 500);
+    }
+
+    const url = `${API_BASE_URL}${endpoint}`;
+
+    const headers = {
+      'Content-Type': 'application/json',
+      ...(options.headers || {})
+    };
 
     const config = {
-      ...options,
-      credentials: 'include',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-User-Type': 'vendor',
-        ...options.headers
-      }
-    }
+      method: options.method || 'GET',
+      headers,
+      body: options.body,
+      credentials: 'include' // 🔥 SEND VENDOR COOKIE
+    };
 
-    // ✅ Add Authorization header if token exists
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
-    
-    // ✅ Log for debugging (remove in production)
-    console.log('🌐 API Request:', {
+    console.log('🌐 Vendor API Request:', {
       url,
       method: config.method,
-      hasToken: !!token,
-      tokenPreview: token ? token.substring(0, 20) + '...' : 'No token',
-      vendorId: vendorData?._id || 'No vendor ID'
-    })
+      endpoint
+    });
 
     try {
-      const response = await fetch(url, config)
+      const response = await fetch(url, config);
 
-      const contentType = response.headers.get('content-type')
+      const contentType = response.headers.get('content-type');
       const data = contentType?.includes('application/json')
         ? await response.json()
-        : await response.text()
+        : await response.text();
 
       if (!response.ok) {
+        console.error('❌ Vendor API Error:', {
+          status: response.status,
+          data
+        });
+
+        // Auto-handle auth failure
+        if (response.status === 401) {
+          localStorage.removeItem('vendorUser');
+        }
+
         throw new ApiError(
-          data?.message || `HTTP error ${response.status}`,
+          data?.message || 'Request failed',
           response.status,
           data
-        )
+        );
       }
 
-      return data
+      return data;
     } catch (error) {
-      console.error('🌐 API Request Error:', error)
-      if (error instanceof ApiError) throw error
-      throw new ApiError(error.message || 'Network error', 0)
+      console.error('💥 Vendor API Request Error:', {
+        endpoint,
+        message: error.message
+      });
+
+      if (error instanceof ApiError) throw error;
+
+      throw new ApiError(error.message || 'Network error', 0);
     }
   },
 
+  // ------------------------
+  // HTTP METHODS
+  // ------------------------
+
   get(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'GET' })
+    return this.request(endpoint, {
+      ...options,
+      method: 'GET'
+    });
   },
 
   post(endpoint, data, options = {}) {
@@ -127,7 +96,7 @@ export const api = {
       ...options,
       method: 'POST',
       body: JSON.stringify(data)
-    })
+    });
   },
 
   put(endpoint, data, options = {}) {
@@ -135,46 +104,33 @@ export const api = {
       ...options,
       method: 'PUT',
       body: JSON.stringify(data)
-    })
+    });
   },
 
   delete(endpoint, options = {}) {
-    return this.request(endpoint, { ...options, method: 'DELETE' })
+    return this.request(endpoint, {
+      ...options,
+      method: 'DELETE'
+    });
   },
 
-  async upload(endpoint, formData, options = {}) {
-    const url = `${API_BASE_URL}${endpoint}`
-    
-    const token = getToken()
-    const config = {
+  // ------------------------
+  // FILE UPLOAD
+  // ------------------------
+
+  upload(endpoint, formData, options = {}) {
+    const headers = {
+      ...(options.headers || {})
+    };
+
+    // IMPORTANT: do NOT set Content-Type manually
+    delete headers['Content-Type'];
+
+    return this.request(endpoint, {
       ...options,
-      method: options.method || 'POST',
+      method: 'POST',
       body: formData,
-      credentials: 'include',
-      headers: {
-        'X-User-Type': 'vendor',
-        ...options.headers
-      }
-    }
-
-    if (token) {
-      config.headers['Authorization'] = `Bearer ${token}`
-    }
-
-    const response = await fetch(url, config)
-    const data = await response.json()
-
-    if (!response.ok) {
-      throw new ApiError(
-        data?.message || `HTTP error ${response.status}`,
-        response.status,
-        data
-      )
-    }
-
-    return data
+      headers
+    });
   }
-}
-
-// ✅ Export helper functions
-export { getToken, getVendorId, getVendorData }
+};

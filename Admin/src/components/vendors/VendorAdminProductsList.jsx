@@ -17,17 +17,22 @@ import {
   Building2,
   Calendar,
   BarChart,
-  ShoppingBag
+  ShoppingBag,
+  RefreshCw
 } from 'lucide-react';
-import { fetchVendorProducts, deleteProductAdmin } from '../../store/slices/adminProductSlice';
+import { fetchVendorProducts, deleteProductAdmin, fetchVendorProductStats, updateProductAdmin } from '../../store/slices/adminProductSlice';
+import AdminProductQuickView from './AdminProductQuickView';
 
 const VendorAdminProductsList = ({ vendorId, vendorName }) => {
   const dispatch = useDispatch();
   const { vendorProducts, loading, vendorStats, pagination } = useSelector((state) => state.adminProducts);
-  
+
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [refreshing, setRefreshing] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showQuickView, setShowQuickView] = useState(false);
 
   // Fetch products for this vendor
   useEffect(() => {
@@ -41,10 +46,28 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
           status: statusFilter
         }
       }));
+
+      // Fetch vendor stats
+      dispatch(fetchVendorProductStats(vendorId));
     }
   }, [dispatch, vendorId, search, statusFilter, currentPage]);
 
+  const handleRefresh = () => {
+    setRefreshing(true);
+    dispatch(fetchVendorProducts({
+      vendorId,
+      params: {
+        page: currentPage,
+        limit: 10,
+        search,
+        status: statusFilter
+      }
+    })).finally(() => {
+      setRefreshing(false);
+    });
 
+    dispatch(fetchVendorProductStats(vendorId));
+  };
 
   // Handle delete product
   const handleDeleteProduct = async (productId) => {
@@ -67,10 +90,23 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
     }
   };
 
-  // Use vendorStats instead of local stats calculation
-  const stats = vendorStats;
+  const handleQuickView = (product) => {
+    setSelectedProduct(product);
+    setShowQuickView(true);
+  };
 
-  const getStatusBadge = (status) => {
+  const handleProductUpdate = (updatedProduct) => {
+    // Update the product in the list
+    setSelectedProduct(updatedProduct);
+
+    // Refresh the list to show updated data
+    handleRefresh();
+  };
+
+  const getStatusBadge = (status, stock) => {
+    // Use stock to determine actual status if needed
+    const actualStatus = stock <= 0 ? 'out_of_stock' : status;
+
     const badges = {
       active: {
         bg: 'bg-green-100',
@@ -86,17 +122,40 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
         bg: 'bg-red-100',
         text: 'text-red-800',
         icon: <AlertCircle className="w-4 h-4" />
+      },
+      low_stock: {
+        bg: 'bg-yellow-100',
+        text: 'text-yellow-800',
+        icon: <AlertCircle className="w-4 h-4" />
       }
     };
-    
-    const badge = badges[status] || badges.inactive;
+
+    const badge = badges[actualStatus] || badges.inactive;
     return (
       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
         {badge.icon}
-        <span className="ml-1 capitalize">{status.replace('_', ' ')}</span>
+        <span className="ml-1 capitalize">
+          {actualStatus.replace('_', ' ')}
+          {actualStatus === 'active' && stock < 10 && ` (${stock})`}
+        </span>
       </span>
     );
   };
+
+  // Update the stats display to show real-time stock status
+  const stats = vendorStats || {
+    totalProducts: 0,
+    activeProducts: 0,
+    outOfStockProducts: 0,
+    totalStock: 0,
+    totalValue: 0,
+    avgPrice: 0
+  };
+
+  // Calculate low stock products
+  const lowStockProducts = vendorProducts.filter(p =>
+    p.quantityInStock > 0 && p.quantityInStock < 10
+  ).length;
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('en-US', {
@@ -113,27 +172,29 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
     });
   };
 
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Stats Cards for this Vendor */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Stats Cards with refresh button */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Package className="w-6 h-6 text-blue-600" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium text-gray-600">Total Products</p>
+                <p className="text-xl font-bold text-gray-900">{stats.totalProducts}</p>
+              </div>
             </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Total Products</p>
-              <p className="text-xl font-bold text-gray-900">{stats.totalProducts}</p>
-            </div>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing}
+              className="p-1 text-gray-400 hover:text-gray-600"
+              title="Refresh stats"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
           </div>
           <div className="mt-2 flex items-center text-sm text-gray-500">
             <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
@@ -152,7 +213,11 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
             </div>
           </div>
           <div className="mt-2 text-sm text-gray-500">
-            Units available
+            {lowStockProducts > 0 && (
+              <span className="text-yellow-600">
+                {lowStockProducts} low stock
+              </span>
+            )}
           </div>
         </div>
 
@@ -173,8 +238,8 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
 
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
-            <div className="p-2 bg-orange-100 rounded-lg">
-              <BarChart className="w-6 h-6 text-orange-600" />
+            <div className="p-2 bg-red-100 rounded-lg">
+              <AlertCircle className="w-6 h-6 text-red-600" />
             </div>
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Out of Stock</p>
@@ -185,38 +250,19 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
             Requires attention
           </div>
         </div>
-      </div>
 
-      {/* Search and Filter */}
-      <div className="bg-white shadow rounded-lg p-4">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-4 md:space-y-0">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              <input
-                type="text"
-                placeholder="Search vendor products..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-yellow-100 rounded-lg">
+              <BarChart className="w-6 h-6 text-yellow-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Low Stock</p>
+              <p className="text-xl font-bold text-gray-900">{lowStockProducts}</p>
             </div>
           </div>
-          
-          <div className="flex items-center space-x-3">
-            <div className="flex items-center">
-              <Filter className="w-5 h-5 text-gray-400 mr-2" />
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="">All Status</option>
-                <option value="active">Active</option>
-                <option value="inactive">Inactive</option>
-                <option value="out_of_stock">Out of Stock</option>
-              </select>
-            </div>
+          <div className="mt-2 text-sm text-gray-500">
+            Less than 10 units
           </div>
         </div>
       </div>
@@ -295,13 +341,13 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
                           </div>
                         </div>
                       </td>
-                      
+
                       <td className="px-6 py-4">
                         <div className="text-sm font-mono text-gray-900">
                           {product.ndcNumber}
                         </div>
                       </td>
-                      
+
                       <td className="px-6 py-4">
                         <div className="space-y-1">
                           <div className="text-sm">
@@ -316,11 +362,11 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
                           </div>
                         </div>
                       </td>
-                      
+
                       <td className="px-6 py-4">
-                        {getStatusBadge(product.status)}
+                        {getStatusBadge(product.status, product.quantityInStock)}
                       </td>
-                      
+
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">
                           {formatDate(product.expirationDate)}
@@ -329,8 +375,8 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
                           {new Date(product.expirationDate) < new Date() ? 'Expired' : 'Valid'}
                         </div>
                       </td>
-                      
-                      <td className="px-6 py-4">
+
+                      {/* <td className="px-6 py-4">
                         <div className="flex items-center space-x-2">
                           <button
                             onClick={() => window.open(`/admin/products/${product._id}`, '_blank')}
@@ -354,13 +400,32 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+                      </td> */}
+
+                      <td className="px-6 py-4">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleQuickView(product)}
+                            className="p-2 bg-blue-50 text-blue-600 hover:bg-blue-100 rounded-lg transition-colors"
+                            title="Quick View"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteProduct(product._id)}
+                            className="p-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-lg transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
-            
+
             {/* Pagination */}
             {pagination.pages > 1 && (
               <div className="px-6 py-4 border-t border-gray-200">
@@ -393,6 +458,16 @@ const VendorAdminProductsList = ({ vendorId, vendorName }) => {
           </>
         )}
       </div>
+      {showQuickView && selectedProduct && (
+        <AdminProductQuickView
+          product={selectedProduct}
+          onClose={() => {
+            setShowQuickView(false);
+            setSelectedProduct(null);
+          }}
+          onUpdate={handleProductUpdate}
+        />
+      )}
     </div>
   );
 };

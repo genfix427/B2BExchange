@@ -39,11 +39,11 @@ export const fetchAdminProduct = createAsyncThunk(
 );
 
 export const updateProductAdmin = createAsyncThunk(
-    'adminProducts/updateProduct',
+    'adminProducts/updateProductAdmin',
     async ({ id, data }, { rejectWithValue }) => {
         try {
             const response = await productService.updateProductAdmin(id, data);
-            return response;
+            return response.data;
         } catch (error) {
             return rejectWithValue(error.message || 'Failed to update product');
         }
@@ -70,6 +70,30 @@ export const fetchAdminProductStats = createAsyncThunk(
             return response.data;
         } catch (error) {
             return rejectWithValue(error.message || 'Failed to fetch stats');
+        }
+    }
+);
+
+export const refreshAdminStats = createAsyncThunk(
+    'adminProducts/refreshStats',
+    async (_, { rejectWithValue }) => {
+        try {
+            const response = await productService.getAdminProductStats();
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to refresh stats');
+        }
+    }
+);
+
+export const fetchVendorProductStats = createAsyncThunk(
+    'adminProducts/fetchVendorProductStats',
+    async (vendorId, { rejectWithValue }) => {
+        try {
+            const response = await productService.getVendorProductStats(vendorId);
+            return { vendorId, stats: response.data };
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to fetch vendor stats');
         }
     }
 );
@@ -185,10 +209,10 @@ const adminProductSlice = createSlice({
             .addCase(updateProductAdmin.fulfilled, (state, action) => {
                 state.loading = false;
                 state.success = true;
-                state.currentProduct = action.payload;
-                const index = state.products.findIndex(p => p._id === action.payload._id);
+                // Update in vendorProducts array
+                const index = state.vendorProducts.findIndex(p => p._id === action.payload._id);
                 if (index !== -1) {
-                    state.products[index] = action.payload;
+                    state.vendorProducts[index] = action.payload;
                 }
             })
             .addCase(updateProductAdmin.rejected, (state, action) => {
@@ -222,7 +246,31 @@ const adminProductSlice = createSlice({
             .addCase(fetchAdminProductStats.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.payload;
-            });
+            })
+            .addCase(refreshAdminStats.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(refreshAdminStats.fulfilled, (state, action) => {
+                state.loading = false;
+                state.stats = action.payload;
+            })
+            .addCase(refreshAdminStats.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
+
+            // Fetch Vendor Product Stats
+            .addCase(fetchVendorProductStats.pending, (state) => {
+                state.loading = true;
+            })
+            .addCase(fetchVendorProductStats.fulfilled, (state, action) => {
+                state.loading = false;
+                state.vendorStats = action.payload.stats;
+            })
+            .addCase(fetchVendorProductStats.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.payload;
+            })
     }
 });
 

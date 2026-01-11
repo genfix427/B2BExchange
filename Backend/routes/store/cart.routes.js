@@ -6,7 +6,8 @@ import {
   addToCart,
   updateCartItem,
   removeFromCart,
-  clearCart
+  clearCart,
+  validateCart
 } from '../../controllers/store/cart.controller.js';
 
 const router = express.Router();
@@ -17,6 +18,9 @@ router.use(vendorProtect);
 router.route('/')
   .get(getCart)
   .delete(clearCart);
+
+router.route('/validate') // Add this route
+  .get(validateCart);
 
 router.route('/items')
   .post(addToCart);

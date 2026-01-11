@@ -10,8 +10,8 @@ import {
   CheckCircle,
   Star
 } from 'lucide-react'
-import { 
-  fetchStoreProducts, 
+import {
+  fetchStoreProducts,
   fetchFeaturedProducts,
   fetchStoreFilters,
   fetchCart,
@@ -38,7 +38,7 @@ const StorePage = () => {
   } = useSelector((state) => state.store || {})
 
   const storeState = useSelector((state) => state.store);
-  
+
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [localFilters, setLocalFilters] = useState({
@@ -66,7 +66,7 @@ const StorePage = () => {
         dispatch(setFilters({ ...filters, search: searchQuery }))
       }
     }, 500)
-    
+
     return () => clearTimeout(timeoutId)
   }, [searchQuery, dispatch])
 
@@ -158,7 +158,7 @@ const StorePage = () => {
             <Filter className="w-4 h-4 mr-2" />
             {showFilters ? 'Hide Filters' : 'Show Filters'}
           </button>
-          
+
           <div className="flex items-center space-x-4">
             <span className="text-sm text-gray-600">
               {pagination.total} products found
@@ -178,7 +178,7 @@ const StorePage = () => {
                 Clear all
               </button>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
@@ -193,7 +193,7 @@ const StorePage = () => {
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Price Range</label>
                 <div className="flex space-x-2">
@@ -213,7 +213,7 @@ const StorePage = () => {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Vendor</label>
                 <select
@@ -227,7 +227,7 @@ const StorePage = () => {
                   ))}
                 </select>
               </div>
-              
+
               <div className="space-y-3">
                 <label className="flex items-center">
                   <input
@@ -238,7 +238,7 @@ const StorePage = () => {
                   />
                   <span className="ml-2 text-sm text-gray-700">In Stock Only</span>
                 </label>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Sort By</label>
                   <select
@@ -262,12 +262,12 @@ const StorePage = () => {
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-900">Featured Products</h2>
             </div>
-            
+
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {featuredProducts.slice(0, 4).map((product) => {
                 const inWishlist = isInWishlist(product._id)
                 return (
-                  <ProductCard 
+                  <ProductCard
                     key={product._id}
                     product={product}
                     onAddToCart={() => handleAddToCart(product._id)}
@@ -283,7 +283,7 @@ const StorePage = () => {
         {/* Main Products Grid */}
         <div>
           <h2 className="text-xl font-bold text-gray-900 mb-6">All Products</h2>
-          
+
           {loading ? (
             <div className="flex justify-center items-center h-64">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -301,7 +301,7 @@ const StorePage = () => {
                 {products.map((product) => {
                   const inWishlist = isInWishlist(product._id)
                   return (
-                    <ProductCard 
+                    <ProductCard
                       key={product._id}
                       product={product}
                       onAddToCart={() => handleAddToCart(product._id)}
@@ -339,7 +339,7 @@ const StorePage = () => {
                     >
                       Previous
                     </button>
-                    
+
                     {[...Array(Math.min(5, pagination.pages))].map((_, i) => {
                       let pageNum
                       if (pagination.pages <= 5) {
@@ -351,22 +351,21 @@ const StorePage = () => {
                       } else {
                         pageNum = pagination.page - 2 + i
                       }
-                      
+
                       return (
                         <button
                           key={pageNum}
                           onClick={() => updateFilter('page', pageNum)}
-                          className={`px-3 py-2 border rounded-md text-sm font-medium ${
-                            pagination.page === pageNum
+                          className={`px-3 py-2 border rounded-md text-sm font-medium ${pagination.page === pageNum
                               ? 'bg-blue-600 text-white border-blue-600'
                               : 'border-gray-300 text-gray-700 hover:bg-gray-50'
-                          }`}
+                            }`}
                         >
                           {pageNum}
                         </button>
                       )
                     })}
-                    
+
                     <button
                       onClick={() => updateFilter('page', Math.min(pagination.pages, pagination.page + 1))}
                       disabled={pagination.page === pagination.pages}
@@ -395,26 +394,31 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
   }
 
   const getStatusBadge = (status, stock) => {
-    if (stock === 0) {
+    if (stock <= 0) {
       return (
         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
           Out of Stock
         </span>
-      )
-    }
-    if (stock < 10) {
+      );
+    } else if (stock < 5) {
       return (
         <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
-          Low Stock
+          Limited Stock ({stock})
         </span>
-      )
+      );
+    } else if (stock < 10) {
+      return (
+        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-orange-100 text-orange-800">
+          Low Stock ({stock})
+        </span>
+      );
     }
     return (
       <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
         In Stock
       </span>
-    )
-  }
+    );
+  };
 
   return (
     <div className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden">
@@ -432,19 +436,19 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
             </div>
           )}
         </div>
-        
+
         <button
           onClick={onToggleWishlist}
           className="absolute top-2 right-2 p-2 bg-white rounded-full shadow hover:bg-gray-50 z-10"
         >
           <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
         </button>
-        
+
         <div className="absolute top-2 left-2">
           {getStatusBadge(product.status, product.quantityInStock)}
         </div>
       </div>
-      
+
       <div className="p-4">
         <div className="mb-2">
           <h3 className="font-bold text-gray-900 line-clamp-2 text-sm">
@@ -454,7 +458,7 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
             NDC: {product.ndcNumber || 'N/A'}
           </p>
         </div>
-        
+
         <div className="mb-3">
           <p className="text-sm text-gray-700">
             {product.strength} • {product.dosageForm}
@@ -463,7 +467,7 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
             {product.manufacturer || 'Unknown'}
           </p>
         </div>
-        
+
         <div className="flex items-center justify-between mb-3">
           <div className="text-lg font-bold text-blue-600">
             {formatPrice(product.price)}
@@ -472,24 +476,30 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
             {product.vendorName || 'Vendor'}
           </div>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <div className="text-xs text-gray-600">
-            Stock: <span className={`font-medium ${product.quantityInStock < 10 ? 'text-yellow-600' : 'text-green-600'}`}>
+            Stock:
+            <span className={`font-medium ml-1 ${product.quantityInStock <= 0 ? 'text-red-600' :
+                product.quantityInStock < 5 ? 'text-red-600' :
+                  product.quantityInStock < 10 ? 'text-yellow-600' :
+                    'text-green-600'
+              }`}>
               {product.quantityInStock || 0}
+              {product.quantityInStock < 10 && product.quantityInStock > 0 && ' left'}
             </span>
           </div>
-          
+
           <button
             onClick={onAddToCart}
-            disabled={product.quantityInStock === 0}
-            className={`px-3 py-1.5 rounded text-sm font-medium ${
-              product.quantityInStock === 0
+            disabled={product.quantityInStock <= 0}
+            className={`px-3 py-1.5 rounded text-sm font-medium ${product.quantityInStock <= 0
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : 'bg-blue-600 text-white hover:bg-blue-700'
-            }`}
+              }`}
           >
-            {product.quantityInStock === 0 ? 'Out of Stock' : 'Add to Cart'}
+            {product.quantityInStock <= 0 ? 'Out of Stock' :
+              product.quantityInStock < 5 ? 'Low Stock' : 'Add to Cart'}
           </button>
         </div>
       </div>

@@ -88,33 +88,51 @@ const VendorProductsPage = () => {
     }
   };
   
-  const getStatusBadge = (status) => {
-    const badges = {
-      active: {
-        bg: 'bg-green-100',
-        text: 'text-green-800',
-        icon: <CheckCircle className="w-4 h-4" />
-      },
-      inactive: {
-        bg: 'bg-gray-100',
-        text: 'text-gray-800',
-        icon: <XCircle className="w-4 h-4" />
-      },
-      out_of_stock: {
-        bg: 'bg-red-100',
-        text: 'text-red-800',
-        icon: <AlertCircle className="w-4 h-4" />
-      }
-    };
-    
-    const badge = badges[status] || badges.inactive;
+  const getStatusBadge = (status, stock) => {
+  // Use stock to determine actual status
+  if (stock <= 0) {
     return (
-      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
-        {badge.icon}
-        <span className="ml-1 capitalize">{status.replace('_', ' ')}</span>
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800`}>
+        <AlertCircle className="w-4 h-4" />
+        <span className="ml-1">Out of Stock</span>
       </span>
     );
+  } else if (stock < 5) {
+    return (
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800`}>
+        <AlertCircle className="w-4 h-4" />
+        <span className="ml-1">Low Stock ({stock})</span>
+      </span>
+    );
+  }
+
+   // Use original status for other cases
+  const badges = {
+    active: {
+      bg: 'bg-green-100',
+      text: 'text-green-800',
+      icon: <CheckCircle className="w-4 h-4" />
+    },
+    inactive: {
+      bg: 'bg-gray-100',
+      text: 'text-gray-800',
+      icon: <XCircle className="w-4 h-4" />
+    },
+    out_of_stock: {
+      bg: 'bg-red-100',
+      text: 'text-red-800',
+      icon: <AlertCircle className="w-4 h-4" />
+    }
   };
+  
+  const badge = badges[status] || badges.inactive;
+  return (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${badge.bg} ${badge.text}`}>
+      {badge.icon}
+      <span className="ml-1 capitalize">{status.replace('_', ' ')}</span>
+    </span>
+  );
+};
   
   const formatDate = (date) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -364,7 +382,7 @@ const VendorProductsPage = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {getStatusBadge(product.status)}
+                        {getStatusBadge(product.status, product.quantityInStock)}
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm text-gray-900">

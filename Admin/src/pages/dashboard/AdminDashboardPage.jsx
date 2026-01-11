@@ -14,7 +14,7 @@ import {
   ShoppingBag,
   BarChart
 } from 'lucide-react';
-import { fetchAdminProductStats, fetchAllProducts } from '../../store/slices/adminProductSlice';
+import { fetchAdminProductStats, fetchAllProducts, refreshAdminStats } from '../../store/slices/adminProductSlice';
 
 const AdminDashboardPage = () => {
   const dispatch = useDispatch();
@@ -23,7 +23,7 @@ const AdminDashboardPage = () => {
   useEffect(() => {
     // Fetch product stats
     dispatch(fetchAdminProductStats());
-    
+
     // Fetch recent products (first page, sorted by creation date)
     dispatch(fetchAllProducts({
       page: 1,
@@ -35,6 +35,10 @@ const AdminDashboardPage = () => {
 
   // Get recent products (last 5 from the fetched products)
   const recentProducts = products.slice(0, 5);
+
+  const handleRefreshStats = () => {
+    dispatch(refreshAdminStats());
+  };
 
   const getStatusColor = (status) => {
     const colors = {
@@ -88,20 +92,28 @@ const AdminDashboardPage = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Package className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Total Products</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalProducts || 0}</p>
-            </div>
-          </div>
-          <div className="mt-4 flex items-center text-sm text-gray-500">
-            <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-            <span>Active: {stats.activeProducts || 0}</span>
-          </div>
-        </div>
+  <div className="flex items-center">
+    <div className="p-2 bg-blue-100 rounded-lg">
+      <Package className="w-6 h-6 text-blue-600" />
+    </div>
+    <div className="ml-3">
+      <p className="text-sm font-medium text-gray-600">Total Products</p>
+      <p className="text-2xl font-bold text-gray-900">{stats.totalProducts || 0}</p>
+    </div>
+  </div>
+  <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
+    <div className="flex items-center">
+      <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
+      <span>Active: {stats.activeProducts || 0}</span>
+    </div>
+    <button
+      onClick={handleRefreshStats}
+      className="text-blue-600 hover:text-blue-800"
+    >
+      Refresh
+    </button>
+  </div>
+</div>
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center">
@@ -242,7 +254,7 @@ const AdminDashboardPage = () => {
                         </div>
                       </div>
                     </td>
-                    
+
                     <td className="px-6 py-4">
                       <div className="flex items-center">
                         <Building2 className="h-4 w-4 text-gray-400 mr-2" />
@@ -256,7 +268,7 @@ const AdminDashboardPage = () => {
                         </div>
                       </div>
                     </td>
-                    
+
                     <td className="px-6 py-4">
                       <div className="space-y-1">
                         <div className="text-sm">
@@ -268,7 +280,7 @@ const AdminDashboardPage = () => {
                         </div>
                       </div>
                     </td>
-                    
+
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(product.status)}`}>
                         {product.status === 'active' && (
@@ -280,7 +292,7 @@ const AdminDashboardPage = () => {
                         {product.status?.replace('_', ' ') || 'Unknown'}
                       </span>
                     </td>
-                    
+
                     <td className="px-6 py-4">
                       <div className="text-sm text-gray-900">
                         {product.createdAt ? formatDate(product.createdAt) : 'N/A'}

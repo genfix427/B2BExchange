@@ -10,17 +10,17 @@ export const getStoreProducts = async (req, res, next) => {
   try {
     console.log('🛍️ Store products request - User ID:', req.user?.id);
     console.log('🛍️ Query parameters:', req.query);
-    
-    const { 
-      page = 1, 
-      limit = 12, 
-      search = '', 
-      category = '', 
-      minPrice = '', 
-      maxPrice = '', 
+
+    const {
+      page = 1,
+      limit = 12,
+      search = '',
+      category = '',
+      minPrice = '',
+      maxPrice = '',
       inStock = 'true', // Default is 'true'
       vendor = '',
-      sort = 'newest' 
+      sort = 'newest'
     } = req.query;
 
     const skip = (page - 1) * limit;
@@ -98,7 +98,7 @@ export const getStoreProducts = async (req, res, next) => {
       .limit(Number(limit));
 
     console.log('🛍️ Found products:', products.length);
-    
+
     if (products.length > 0) {
       console.log('🛍️ First product:', {
         id: products[0]._id,
@@ -110,6 +110,12 @@ export const getStoreProducts = async (req, res, next) => {
       });
     }
 
+    if (inStock === 'true') {
+      query.quantityInStock = { $gt: 0 };
+      console.log('🛍️ Applying stock filter: quantityInStock > 0');
+    }
+
+    // In the response mapping, add stockStatus:
     res.status(200).json({
       success: true,
       count: products.length,
@@ -124,7 +130,8 @@ export const getStoreProducts = async (req, res, next) => {
         dosageForm: product.dosageForm,
         manufacturer: product.manufacturer,
         price: product.price,
-        quantityInStock: product.quantityInStock, // This shows negative value
+        quantityInStock: product.quantityInStock,
+        stockStatus: product.stockStatus, // Add this
         image: product.image,
         vendor: product.vendor?._id,
         vendorName: product.vendorName || (product.vendor?.pharmacyInfo?.legalBusinessName || product.vendor?.pharmacyInfo?.dba),
@@ -154,14 +161,14 @@ export const getStoreProduct = async (req, res, next) => {
           select: 'city state shippingAddress'
         }
       });
-    
+
     if (!product) {
       return res.status(404).json({
         success: false,
         message: 'Product not found'
       });
     }
-    
+
     // Check if vendor is approved
     const vendor = await Vendor.findById(product.vendor);
     if (!vendor || vendor.status !== 'approved') {
@@ -170,7 +177,7 @@ export const getStoreProduct = async (req, res, next) => {
         message: 'Product not available'
       });
     }
-    
+
     // Get related products from same vendor (exclude current product)
     const relatedProducts = await Product.find({
       vendor: product.vendor,
@@ -178,10 +185,10 @@ export const getStoreProduct = async (req, res, next) => {
       status: 'active',
       quantityInStock: { $gt: 0 }
     })
-    .limit(4)
-    .select('productName strength dosageForm price image quantityInStock vendorName')
-    .populate('vendor', 'pharmacyInfo.legalBusinessName');
-    
+      .limit(4)
+      .select('productName strength dosageForm price image quantityInStock vendorName')
+      .populate('vendor', 'pharmacyInfo.legalBusinessName');
+
     res.status(200).json({
       success: true,
       data: {
@@ -226,17 +233,17 @@ export const getStoreProduct = async (req, res, next) => {
 export const getFeaturedProducts = async (req, res, next) => {
   try {
     console.log('🛍️ Featured products request - User ID:', req.user?.id);
-    
+
     const userId = req.user.id;
-    
+
     // Get approved vendors (excluding current user)
-    const approvedVendors = await Vendor.find({ 
+    const approvedVendors = await Vendor.find({
       status: 'approved',
       _id: { $ne: userId }
     }).select('_id');
-    
+
     const approvedVendorIds = approvedVendors.map(v => v._id);
-    
+
     console.log('🛍️ Approved vendor IDs for featured:', approvedVendorIds.length);
 
     // Get 8 random active products from approved vendors
@@ -280,7 +287,7 @@ export const getFeaturedProducts = async (req, res, next) => {
         }
       }
     ]);
-    
+
     console.log('🛍️ Featured products found:', products.length);
 
     res.status(200).json({
@@ -313,22 +320,22 @@ export const searchProducts = async (req, res, next) => {
   try {
     const { q } = req.query;
     const userId = req.user.id;
-    
+
     if (!q) {
       return res.status(400).json({
         success: false,
         message: 'Search query is required'
       });
     }
-    
+
     // Find approved vendors (excluding self)
-    const approvedVendors = await Vendor.find({ 
+    const approvedVendors = await Vendor.find({
       status: 'approved',
       _id: { $ne: userId }
     }).select('_id');
-    
+
     const approvedVendorIds = approvedVendors.map(v => v._id);
-    
+
     const products = await Product.find({
       vendor: { $in: approvedVendorIds },
       status: 'active',
@@ -339,10 +346,10 @@ export const searchProducts = async (req, res, next) => {
         { dosageForm: { $regex: q, $options: 'i' } }
       ]
     })
-    .limit(20)
-    .select('productName strength dosageForm manufacturer price image quantityInStock vendorName vendor')
-    .populate('vendor', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba');
-    
+      .limit(20)
+      .select('productName strength dosageForm manufacturer price image quantityInStock vendorName vendor')
+      .populate('vendor', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba');
+
     res.status(200).json({
       success: true,
       count: products.length,
@@ -371,21 +378,21 @@ export const searchProducts = async (req, res, next) => {
 export const getFilters = async (req, res, next) => {
   try {
     const userId = req.user.id;
-    
+
     // Get approved vendors (excluding self)
-    const approvedVendors = await Vendor.find({ 
+    const approvedVendors = await Vendor.find({
       status: 'approved',
       _id: { $ne: userId }
     }).select('_id');
-    
+
     const approvedVendorIds = approvedVendors.map(v => v._id);
-    
+
     // Get all dosage forms
     const dosageForms = await Product.distinct('dosageForm', {
       vendor: { $in: approvedVendorIds },
       status: 'active'
     });
-    
+
     // Get price range
     const priceStats = await Product.aggregate([
       {
@@ -404,15 +411,15 @@ export const getFilters = async (req, res, next) => {
         }
       }
     ]);
-    
+
     // Get vendors list
-    const vendors = await Vendor.find({ 
+    const vendors = await Vendor.find({
       status: 'approved',
       _id: { $ne: userId }
     })
-    .select('pharmacyInfo.legalBusinessName pharmacyInfo.dba')
-    .limit(20);
-    
+      .select('pharmacyInfo.legalBusinessName pharmacyInfo.dba')
+      .limit(20);
+
     res.status(200).json({
       success: true,
       data: {

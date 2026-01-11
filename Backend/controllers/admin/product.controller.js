@@ -3,6 +3,7 @@ import mongoose from 'mongoose'; // Add this import
 import Product from '../../models/Product.model.js';
 import Vendor from '../../models/Vendor.model.js';
 import { deleteFromCloudinary } from '../../services/cloudinary.service.js';
+import stockMonitoringService from '../../services/stockMonitoring.service.js';
 
 // @desc    Get all products (admin)
 // @route   GET /api/admin/products
@@ -292,51 +293,101 @@ export const deleteProductAdmin = async (req, res, next) => {
 // @desc    Get product statistics (admin)
 // @route   GET /api/admin/products/stats
 // @access  Private (Admin)
-export const getProductStatsAdmin = async (req, res, next) => {
-    try {
-        const stats = await Product.aggregate([
-            {
-                $group: {
-                    _id: null,
-                    totalProducts: { $sum: 1 },
-                    activeProducts: {
-                        $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
-                    },
-                    outOfStockProducts: {
-                        $sum: { $cond: [{ $eq: ['$status', 'out_of_stock'] }, 1, 0] }
-                    },
-                    totalVendors: { $addToSet: '$vendor' },
-                    totalStock: { $sum: '$quantityInStock' },
-                    totalValue: { $sum: { $multiply: ['$quantityInStock', '$price'] } },
-                    avgPrice: { $avg: '$price' }
-                }
-            },
-            {
-                $project: {
-                    totalProducts: 1,
-                    activeProducts: 1,
-                    outOfStockProducts: 1,
-                    totalVendors: { $size: '$totalVendors' },
-                    totalStock: 1,
-                    totalValue: 1,
-                    avgPrice: { $round: ['$avgPrice', 2] }
-                }
-            }
-        ]);
+// export const getProductStatsAdmin = async (req, res, next) => {
+//     try {
+//         const stats = await Product.aggregate([
+//             {
+//                 $group: {
+//                     _id: null,
+//                     totalProducts: { $sum: 1 },
+//                     activeProducts: {
+//                         $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
+//                     },
+//                     outOfStockProducts: {
+//                         $sum: { $cond: [{ $eq: ['$status', 'out_of_stock'] }, 1, 0] }
+//                     },
+//                     totalVendors: { $addToSet: '$vendor' },
+//                     totalStock: { $sum: '$quantityInStock' },
+//                     totalValue: { $sum: { $multiply: ['$quantityInStock', '$price'] } },
+//                     avgPrice: { $avg: '$price' }
+//                 }
+//             },
+//             {
+//                 $project: {
+//                     totalProducts: 1,
+//                     activeProducts: 1,
+//                     outOfStockProducts: 1,
+//                     totalVendors: { $size: '$totalVendors' },
+//                     totalStock: 1,
+//                     totalValue: 1,
+//                     avgPrice: { $round: ['$avgPrice', 2] }
+//                 }
+//             }
+//         ]);
 
-        res.status(200).json({
-            success: true,
-            data: stats[0] || {
-                totalProducts: 0,
-                activeProducts: 0,
-                outOfStockProducts: 0,
-                totalVendors: 0,
-                totalStock: 0,
-                totalValue: 0,
-                avgPrice: 0
-            }
-        });
-    } catch (error) {
-        next(error);
+//         res.status(200).json({
+//             success: true,
+//             data: stats[0] || {
+//                 totalProducts: 0,
+//                 activeProducts: 0,
+//                 outOfStockProducts: 0,
+//                 totalVendors: 0,
+//                 totalStock: 0,
+//                 totalValue: 0,
+//                 avgPrice: 0
+//             }
+//         });
+//     } catch (error) {
+//         next(error);
+//     }
+// };
+
+// @desc    Get product statistics (admin) - UPDATED
+// @route   GET /api/admin/products/stats
+// @access  Private (Admin)
+export const getProductStatsAdmin = async (req, res, next) => {
+  try {
+    // First, ensure all product statuses are correct
+    await stockMonitoringService.checkAndUpdateProductStatuses();
+    
+    // Get updated statistics
+    const stats = await stockMonitoringService.getPlatformStockStats();
+    
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// Add new endpoint for vendor-specific stats
+// @desc    Get vendor product statistics
+// @route   GET /api/admin/vendors/:vendorId/products/stats
+// @access  Private (Admin)
+export const getVendorProductStats = async (req, res, next) => {
+  try {
+    const { vendorId } = req.params;
+    
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid vendor ID'
+      });
     }
+    
+    // First ensure product statuses are correct
+    await stockMonitoringService.checkAndUpdateProductStatuses();
+    
+    // Get vendor-specific stats
+    const stats = await stockMonitoringService.getVendorStockStats(vendorId);
+    
+    res.status(200).json({
+      success: true,
+      data: stats
+    });
+  } catch (error) {
+    next(error);
+  }
 };

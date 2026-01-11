@@ -31,6 +31,8 @@ import orderRoutes from './routes/store/order.routes.js';
 import vendorOrderRoutes from './routes/vendor/order.routes.js';
 import checkoutRoutes from './routes/store/checkout.routes.js';
 
+import schedulerService from './services/scheduler.service.js';
+
 // Import middleware
 import errorHandler from './middleware/error.middleware.js';
 
@@ -68,6 +70,8 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+schedulerService.init();
 
 
 /* =========================

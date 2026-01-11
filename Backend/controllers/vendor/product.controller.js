@@ -2,6 +2,7 @@
 import Product from '../../models/Product.model.js';
 import Vendor from '../../models/Vendor.model.js';
 import { uploadToCloudinary, deleteFromCloudinary } from '../../services/cloudinary.service.js';
+import stockMonitoringService from '../../services/stockMonitoring.service.js';
 
 // @desc    Create a new product
 // @route   POST /api/vendor/products
@@ -88,7 +89,7 @@ export const createProduct = async (req, res, next) => {
       originalPackSize: parseInt(originalPackSize),
       isFridgeProduct,
       packQuantity,
-      quantityInStock: parseInt(quantityInStock),
+      quantityInStock: Math.max(0, parseInt(quantityInStock)), // Ensure not negative
       price: parseFloat(price),
       lotNumber,
       image: {
@@ -96,9 +97,12 @@ export const createProduct = async (req, res, next) => {
         publicId: publicId
       },
       vendor: vendor._id,
-      vendorName: vendor.pharmacyInfo?.legalBusinessName || vendor.pharmacyInfo?.dba || 'Unknown Vendor',
-      status: parseInt(quantityInStock) > 0 ? 'active' : 'out_of_stock'
+      vendorName: vendor.pharmacyInfo?.legalBusinessName || vendor.pharmacyInfo?.dba || 'Unknown Vendor'
     });
+
+    // Auto-set status based on stock
+    product.checkAndUpdateStatus();
+    await product.save();
 
     res.status(201).json({
       success: true,
@@ -108,7 +112,7 @@ export const createProduct = async (req, res, next) => {
 
   } catch (error) {
     console.error('Create product error:', error);
-    
+
     // Clean up uploaded image if product creation failed
     if (publicId) {
       try {
@@ -117,7 +121,7 @@ export const createProduct = async (req, res, next) => {
         console.error('Failed to clean up image:', deleteError);
       }
     }
-    
+
     next(error);
   }
 };
@@ -131,7 +135,7 @@ export const getVendorProducts = async (req, res, next) => {
     const skip = (page - 1) * limit;
 
     const query = { vendor: req.user.id };
-    
+
     // Add search filter
     if (search) {
       query.$or = [
@@ -140,7 +144,7 @@ export const getVendorProducts = async (req, res, next) => {
         { manufacturer: { $regex: search, $options: 'i' } }
       ];
     }
-    
+
     // Add status filter
     if (status && ['active', 'inactive', 'out_of_stock'].includes(status)) {
       query.status = status;
@@ -233,11 +237,11 @@ export const updateProduct = async (req, res, next) => {
     if (strength) product.strength = strength;
     if (dosageForm) product.dosageForm = dosageForm;
     if (manufacturer) product.manufacturer = manufacturer;
-    
+
     if (expirationMonth && expirationYear) {
       product.expirationDate = new Date(expirationYear, expirationMonth - 1);
     }
-    
+
     if (packageCondition) product.packageCondition = packageCondition;
     if (originalPackSize) product.originalPackSize = parseInt(originalPackSize);
     if (isFridgeProduct) product.isFridgeProduct = isFridgeProduct;
@@ -256,7 +260,7 @@ export const updateProduct = async (req, res, next) => {
       try {
         // Delete old image
         await deleteFromCloudinary(product.image.publicId);
-        
+
         // Upload new image
         const uploadResult = await uploadToCloudinary(req.file.buffer, 'product_images');
         product.image.url = uploadResult.url;
@@ -321,37 +325,91 @@ export const deleteProduct = async (req, res, next) => {
 // @desc    Get product statistics
 // @route   GET /api/vendor/products/stats
 // @access  Private (Vendor)
+// @desc    Get product statistics - FIXED VERSION
+// @route   GET /api/vendor/products/stats
+// @access  Private (Vendor)
+// export const getProductStats = async (req, res, next) => {
+//   try {
+//     const stats = await Product.aggregate([
+//       {
+//         $match: { vendor: req.user._id }
+//       },
+//       {
+//         $group: {
+//           _id: null,
+//           totalProducts: { $sum: 1 },
+//           activeProducts: {
+//             $sum: {
+//               $cond: [
+//                 { $and: [
+//                   { $eq: ['$status', 'active'] },
+//                   { $gt: ['$quantityInStock', 0] }
+//                 ]},
+//                 1,
+//                 0
+//               ]
+//             }
+//           },
+//           outOfStockProducts: {
+//             $sum: {
+//               $cond: [
+//                 { $or: [
+//                   { $eq: ['$status', 'out_of_stock'] },
+//                   { $lte: ['$quantityInStock', 0] }
+//                 ]},
+//                 1,
+//                 0
+//               ]
+//             }
+//           },
+//           totalStock: { 
+//             $sum: {
+//               $cond: [
+//                 { $gt: ['$quantityInStock', 0] },
+//                 '$quantityInStock',
+//                 0
+//               ]
+//             }
+//           },
+//           totalValue: { 
+//             $sum: {
+//               $cond: [
+//                 { $gt: ['$quantityInStock', 0] },
+//                 { $multiply: ['$quantityInStock', '$price'] },
+//                 0
+//               ]
+//             }
+//           }
+//         }
+//       }
+//     ]);
+
+//     res.status(200).json({
+//       success: true,
+//       data: stats[0] || {
+//         totalProducts: 0,
+//         activeProducts: 0,
+//         outOfStockProducts: 0,
+//         totalStock: 0,
+//         totalValue: 0
+//       }
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 export const getProductStats = async (req, res, next) => {
   try {
-    const stats = await Product.aggregate([
-      {
-        $match: { vendor: req.user._id }
-      },
-      {
-        $group: {
-          _id: null,
-          totalProducts: { $sum: 1 },
-          activeProducts: {
-            $sum: { $cond: [{ $eq: ['$status', 'active'] }, 1, 0] }
-          },
-          outOfStockProducts: {
-            $sum: { $cond: [{ $eq: ['$status', 'out_of_stock'] }, 1, 0] }
-          },
-          totalStock: { $sum: '$quantityInStock' },
-          totalValue: { $sum: { $multiply: ['$quantityInStock', '$price'] } }
-        }
-      }
-    ]);
-
+    // First, ensure all product statuses are correct for this vendor
+    await stockMonitoringService.checkAndUpdateProductStatuses();
+    
+    // Get vendor-specific stats
+    const stats = await stockMonitoringService.getVendorStockStats(req.user._id);
+    
     res.status(200).json({
       success: true,
-      data: stats[0] || {
-        totalProducts: 0,
-        activeProducts: 0,
-        outOfStockProducts: 0,
-        totalStock: 0,
-        totalValue: 0
-      }
+      data: stats
     });
   } catch (error) {
     next(error);

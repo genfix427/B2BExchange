@@ -203,9 +203,9 @@ export default function Header() {
                       </p>
                       <div className="mt-2">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${user.status === 'approved' ? 'bg-green-100 text-green-800' :
-                            user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                              user.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                                'bg-gray-100 text-gray-800'
+                          user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            user.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                              'bg-gray-100 text-gray-800'
                           }`}>
                           {user.status === 'approved' ? '✓ Approved' :
                             user.status === 'pending' ? '⏳ Pending' :
@@ -349,9 +349,9 @@ export default function Header() {
                   </p>
                   <div className="mt-1">
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${user.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          user.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
+                      user.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                        user.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
                       }`}>
                       {user.status === 'approved' ? '✓ Approved' :
                         user.status === 'pending' ? '⏳ Pending' :

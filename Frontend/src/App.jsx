@@ -67,7 +67,7 @@ const AppContent = () => {
     <div className="min-h-screen flex flex-col">
       <Header />
       {showProtectedSubHeader && <ProtectedSubHeader />}
-      <main className="flex-grow pt-16"> {/* Add padding for fixed header */}
+      <main className=""> {/* Add padding for fixed header */}
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<HomePage />} />

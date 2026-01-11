@@ -10,7 +10,7 @@ import JoinBanner from '../components/HomeContent/JoinBanner'
 const HomePage = () => {
 
   return (
-    <div className="mt-20">
+    <div className="">
       <Hero />
       <WhyChooseUs />
       <AboutUsHome />

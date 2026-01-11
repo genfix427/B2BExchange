@@ -46,8 +46,14 @@ const setAdminTokenCookie = (res, token) => {
     path: options.path
   });
 
-  res.cookie('admin_token', token, options);
-  console.log('✅ admin_token cookie set');
+  res.cookie('admin_token', token, {
+  httpOnly: true,
+  secure: true,        // REQUIRED on Render
+  sameSite: 'none',   // REQUIRED for cross-site
+  path: '/',
+  maxAge: 8 * 60 * 60 * 1000
+});
+
 };
 
 // @desc    Admin login

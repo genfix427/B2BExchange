@@ -61,10 +61,6 @@ const AdminLoginPage = () => {
       
       console.log('Admin login successful:', result)
       
-      // Check cookies after login
-      console.log('Checking cookies after login...')
-      cookieHelper.checkCookies()
-      
       // Navigate to dashboard
       navigate('/admin/dashboard', { replace: true })
       

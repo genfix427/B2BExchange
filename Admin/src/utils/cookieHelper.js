@@ -1,57 +1,126 @@
-// Helper to check and manage cookies
+// src/utils/cookieHelper.js
+
+/**
+ * ⚠️ IMPORTANT NOTE
+ * --------------------------------------------------
+ * HttpOnly cookies CANNOT be accessed via JavaScript.
+ * This helper DOES NOT attempt to read cookies.
+ * Authentication state MUST be verified via backend APIs.
+ * --------------------------------------------------
+ */
+
 export const cookieHelper = {
-  // Check if admin_token cookie exists
+  /**
+   * ❌ NEVER USE document.cookie for auth
+   * This always returns false for HttpOnly cookies
+   */
   hasAdminToken() {
-    return document.cookie.includes('admin_token=');
+    console.warn(
+      '[cookieHelper] hasAdminToken() called — HttpOnly cookies cannot be read in JS'
+    );
+    return false;
   },
 
-  // Get admin_token from cookies
-  getAdminToken() {
-    const match = document.cookie.match(/admin_token=([^;]+)/);
-    return match ? match[1] : null;
+  hasVendorToken() {
+    console.warn(
+      '[cookieHelper] hasVendorToken() called — HttpOnly cookies cannot be read in JS'
+    );
+    return false;
   },
 
-  // Check if any token exists
   hasAnyToken() {
-    return document.cookie.includes('admin_token=') || 
-           document.cookie.includes('vendor_token=') || 
-           document.cookie.includes('token=');
+    console.warn(
+      '[cookieHelper] hasAnyToken() called — HttpOnly cookies cannot be read in JS'
+    );
+    return false;
   },
 
-  // Clear all auth cookies
-  clearAllAuthCookies() {
-    const cookies = ['admin_token', 'vendor_token', 'token'];
-    cookies.forEach(cookieName => {
-      document.cookie = `${cookieName}=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;`;
-    });
+  /**
+   * ❌ Cannot read token value
+   */
+  getAdminToken() {
+    console.warn(
+      '[cookieHelper] getAdminToken() called — HttpOnly cookies are inaccessible'
+    );
+    return null;
   },
 
-  // Clear only admin token
+  getVendorToken() {
+    console.warn(
+      '[cookieHelper] getVendorToken() called — HttpOnly cookies are inaccessible'
+    );
+    return null;
+  },
+
+  /**
+   * ❌ Cannot delete HttpOnly cookies from JS
+   * Logout MUST be done via backend API
+   */
   clearAdminToken() {
-    document.cookie = 'admin_token=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+    console.warn(
+      '[cookieHelper] clearAdminToken() called — HttpOnly cookies must be cleared server-side'
+    );
   },
 
-  // Check all cookies (debug function)
-  checkCookies() {
-    console.log('=== COOKIE DEBUG ===');
-    console.log('Document cookies:', document.cookie);
-    
-    const cookies = document.cookie.split(';');
-    console.log('Parsed cookies:');
-    cookies.forEach(cookie => {
-      const [name, value] = cookie.trim().split('=');
-      console.log(`- ${name}: ${value ? '***' : 'empty'}`);
-    });
-    
-    console.log('Has admin_token:', this.hasAdminToken());
-    console.log('Has vendor_token:', document.cookie.includes('vendor_token='));
-    console.log('Has token:', document.cookie.includes('token='));
-    console.log('=== END DEBUG ===');
-    
+  clearVendorToken() {
+    console.warn(
+      '[cookieHelper] clearVendorToken() called — HttpOnly cookies must be cleared server-side'
+    );
+  },
+
+  clearAllAuthCookies() {
+    console.warn(
+      '[cookieHelper] clearAllAuthCookies() called — HttpOnly cookies must be cleared server-side'
+    );
+  },
+
+  /**
+   * ✅ Correct auth verification method
+   * Use backend endpoint instead
+   */
+  async verifyAdminSession(api) {
+    try {
+      const res = await api.get('/admin/auth/me');
+      return {
+        authenticated: true,
+        user: res.data || res,
+      };
+    } catch (error) {
+      return {
+        authenticated: false,
+        error: error.message,
+      };
+    }
+  },
+
+  async verifyVendorSession(api) {
+    try {
+      const res = await api.get('/vendor/auth/me');
+      return {
+        authenticated: true,
+        user: res.data || res,
+      };
+    } catch (error) {
+      return {
+        authenticated: false,
+        error: error.message,
+      };
+    }
+  },
+
+  /**
+   * ✅ Debug helper (SAFE)
+   */
+  debug() {
+    console.info('=== COOKIE DEBUG (SAFE MODE) ===');
+    console.info('HttpOnly cookies are hidden from JavaScript');
+    console.info('Use DevTools → Application → Cookies');
+    console.info('Verify authentication via /auth/me endpoint');
+    console.info('=== END DEBUG ===');
+
     return {
-      hasAdminToken: this.hasAdminToken(),
-      adminToken: this.getAdminToken(),
-      allCookies: document.cookie
+      readableCookies: document.cookie || '(none)',
+      note: 'HttpOnly cookies are intentionally hidden',
     };
-  }
+  },
 };

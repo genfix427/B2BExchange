@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
 import { adminLogin, clearAdminError } from '../../store/slices/adminAuthSlice'
 import { Shield } from 'lucide-react'
-import { cookieHelper } from '../../utils/cookieHelper'
 
 const AdminLoginPage = () => {
   const dispatch = useDispatch()
@@ -19,8 +18,6 @@ const AdminLoginPage = () => {
   const [formErrors, setFormErrors] = useState({})
 
   useEffect(() => {
-    // Clear any existing cookies on login page load
-    cookieHelper.clearAllAuthCookies()
     
     if (isAuthenticated && admin?.role === 'admin') {
       navigate('/admin/dashboard', { replace: true })

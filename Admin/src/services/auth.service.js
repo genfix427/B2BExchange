@@ -1,153 +1,95 @@
-import { api } from './api'
-import { cookieHelper } from '../utils/cookieHelper'
+// src/services/auth.service.js
+import { api } from './api';
 
 export const authService = {
+  // ========================
+  // LOGIN
+  // ========================
   async login(email, password) {
-    try {
-      console.log('Attempting admin login...')
-      
-      // Clear any existing cookies first
-      cookieHelper.clearAllAuthCookies()
-      
-      const response = await api.post('/admin/auth/login', { email, password })
-      
-      console.log('Admin login response:', {
-        success: response.success,
-        cookies: document.cookie
-      })
-      
-      if (response.success) {
-        // Store admin info in localStorage
-        localStorage.setItem('adminToken', 'true')
-        localStorage.setItem('adminUser', JSON.stringify(response.data))
-        localStorage.setItem('adminLastLogin', new Date().toISOString())
-        localStorage.setItem('adminPermissions', JSON.stringify(response.data.permissions || {}))
-        
-        // Check if cookie was set
-        if (!cookieHelper.hasAdminToken()) {
-          console.warn('Admin token cookie not set after login')
-        }
-      }
-      
-      return response.data
-    } catch (error) {
-      console.error('Admin login error:', error)
-      throw error
-    }
+    const response = await api.post('/admin/auth/login', {
+      email,
+      password
+    });
+
+    // Store ONLY non-sensitive info
+    localStorage.setItem('adminUser', JSON.stringify(response.data));
+    localStorage.setItem(
+      'adminPermissions',
+      JSON.stringify(response.data.permissions || {})
+    );
+
+    return response.data;
   },
 
+  // ========================
+  // LOGOUT
+  // ========================
   async logout() {
     try {
-      console.log('Attempting admin logout...')
-      await api.post('/admin/auth/logout')
-      console.log('Admin logout successful')
-    } catch (error) {
-      console.error('Admin logout API error:', error)
+      await api.post('/admin/auth/logout');
     } finally {
-      this.clearAdminStorage()
+      this.clearAdminStorage();
     }
   },
 
+  // ========================
+  // CURRENT ADMIN
+  // ========================
   async getCurrentAdmin() {
-    try {
-      console.log('Getting current admin, cookies:', document.cookie)
-      
-      // Check if we have an admin token cookie
-      if (!cookieHelper.hasAdminToken()) {
-        console.log('No admin_token cookie found, clearing storage')
-        this.clearAdminStorage()
-        throw new Error('No authentication token found')
-      }
+    // 🔥 NEVER check cookies in frontend
+    const response = await api.get('/admin/auth/me');
 
-      const response = await api.get('/admin/auth/me')
-      
-      console.log('Get current admin response:', {
-        success: response.success,
-        hasData: !!response.data,
-        cookies: document.cookie
-      })
+    localStorage.setItem('adminUser', JSON.stringify(response.data));
+    localStorage.setItem(
+      'adminPermissions',
+      JSON.stringify(response.data.permissions || {})
+    );
 
-      if (response.success) {
-        // Update localStorage
-        localStorage.setItem('adminUser', JSON.stringify(response.data))
-        localStorage.setItem('adminPermissions', JSON.stringify(response.data.permissions || {}))
-        return response.data
-      }
-      throw new Error('Failed to get current admin')
-    } catch (error) {
-      console.error('Get current admin error:', {
-        statusCode: error.statusCode,
-        message: error.message,
-        cookies: document.cookie
-      })
-      
-      // If unauthorized, clear storage
-      if (error.statusCode === 401 || error.message.includes('No authentication')) {
-        this.clearAdminStorage()
-      }
-      throw error
-    }
+    return response.data;
   },
 
-  async forgotPassword(email) {
-    const response = await api.post('/admin/auth/forgot-password', { email })
-    return response
+  // ========================
+  // PASSWORD
+  // ========================
+  forgotPassword(email) {
+    return api.post('/admin/auth/forgot-password', { email });
   },
 
-  async resetPassword(token, password) {
-    const response = await api.post(`/admin/auth/reset-password/${token}`, { password })
-    return response
+  resetPassword(token, password) {
+    return api.post(`/admin/auth/reset-password/${token}`, { password });
   },
 
-  // Helper methods
+  // ========================
+  // HELPERS
+  // ========================
   clearAdminStorage() {
-    console.log('Clearing admin storage...')
-    localStorage.removeItem('adminToken')
-    localStorage.removeItem('adminUser')
-    localStorage.removeItem('adminLastLogin')
-    localStorage.removeItem('adminPermissions')
-    // Clear admin cookies
-    cookieHelper.clearAdminToken()
-    console.log('Admin storage cleared')
+    localStorage.removeItem('adminUser');
+    localStorage.removeItem('adminPermissions');
   },
 
   getStoredAdmin() {
     try {
-      const adminData = localStorage.getItem('adminUser')
-      return adminData ? JSON.parse(adminData) : null
-    } catch (error) {
-      console.error('Error parsing stored admin data:', error)
-      return null
+      return JSON.parse(localStorage.getItem('adminUser'));
+    } catch {
+      return null;
     }
   },
 
   isAdminAuthenticated() {
-    // Check both localStorage and cookies
-    const adminData = this.getStoredAdmin()
-    const hasLocalToken = !!localStorage.getItem('adminToken')
-    const hasCookieToken = cookieHelper.hasAdminToken()
-    
-    console.log('Auth check:', {
-      hasAdminData: !!adminData,
-      hasLocalToken,
-      hasCookieToken
-    })
-    
-    return !!adminData && hasLocalToken && hasCookieToken
+    // ✅ Trust backend, not cookies
+    return !!this.getStoredAdmin();
   },
 
   getAdminPermissions() {
     try {
-      const permissions = localStorage.getItem('adminPermissions')
-      return permissions ? JSON.parse(permissions) : {}
-    } catch (error) {
-      return {}
+      return JSON.parse(localStorage.getItem('adminPermissions')) || {};
+    } catch {
+      return {};
     }
   },
 
   hasPermission(permission) {
-    const permissions = this.getAdminPermissions()
-    return permissions[permission] === true
+    return this.getAdminPermissions()[permission] === true;
   },
 
   // Check if we have valid cookies

@@ -417,7 +417,12 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
 
 const StorePage = () => {
   const dispatch = useDispatch();
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
+
+const isVendorAuthenticated =
+  isAuthenticated && user?.role === 'vendor' && user?.status === 'approved';
+
+const vendorData = user;
   const {
     products = [],
     loading = false,
@@ -441,8 +446,8 @@ const StorePage = () => {
   });
 
   // Check if vendor is authenticated
-  const isVendorAuthenticated = authService.isVendorAuthenticated();
-  const vendorData = authService.getStoredVendor();
+  // const isVendorAuthenticated = authService.isVendorAuthenticated();
+  // const vendorData = authService.getStoredVendor();
 
   useEffect(() => {
     if (isVendorAuthenticated) {

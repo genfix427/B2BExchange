@@ -24,13 +24,13 @@ export const api = {
     const url = `${API_BASE_URL}${endpoint}`;
 
     const headers = {
-  ...(options.headers || {})
-};
+      ...(options.headers || {})
+    };
 
-// ✅ Only set JSON header if body is NOT FormData
-if (!(options.body instanceof FormData)) {
-  headers['Content-Type'] = 'application/json';
-}
+    // ✅ Only set JSON header if body is NOT FormData
+    if (!(options.body instanceof FormData)) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     const config = {
       method: options.method || 'GET',
@@ -54,35 +54,35 @@ if (!(options.body instanceof FormData)) {
         : await response.text();
 
       // In your api.js - update the error handling in the request method
-if (!response.ok) {
-  console.error('❌ Vendor API Error:', {
-    status: response.status,
-    data
-  });
+      if (!response.ok) {
+        console.error('❌ Vendor API Error:', {
+          status: response.status,
+          data
+        });
 
-  // Auto-handle auth failure
-  if (response.status === 401) {
-    localStorage.removeItem('vendorUser');
-  }
+        // Auto-handle auth failure
+        if (response.status === 401) {
+          localStorage.removeItem('vendorUser');
+        }
 
-  // Create error with status information from response
-  const errorMessage = data?.message || 'Request failed';
-  const apiError = new ApiError(errorMessage, response.status, data);
-  
-  // Add status info if available in response data
-  if (data?.data?.status) {
-    apiError.status = data.data.status;
-    apiError.rejectionReason = data.data.rejectionReason;
-    apiError.suspensionReason = data.data.suspensionReason;
-  } else if (data?.status) {
-    // Sometimes status might be at the root level
-    apiError.status = data.status;
-    apiError.rejectionReason = data.rejectionReason;
-    apiError.suspensionReason = data.suspensionReason;
-  }
-  
-  throw apiError;
-}
+        // Create error with status information from response
+        const errorMessage = data?.message || 'Request failed';
+        const apiError = new ApiError(errorMessage, response.status, data);
+
+        // Add status info if available in response data
+        if (data?.data?.status) {
+          apiError.status = data.data.status;
+          apiError.rejectionReason = data.data.rejectionReason;
+          apiError.suspensionReason = data.data.suspensionReason;
+        } else if (data?.status) {
+          // Sometimes status might be at the root level
+          apiError.status = data.status;
+          apiError.rejectionReason = data.rejectionReason;
+          apiError.suspensionReason = data.suspensionReason;
+        }
+
+        throw apiError;
+      }
 
       return data;
     } catch (error) {

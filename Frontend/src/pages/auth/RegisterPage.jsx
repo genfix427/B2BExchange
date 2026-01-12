@@ -8,7 +8,8 @@ import Step3PrimaryContact from '../../components/auth/Registration/Step3Primary
 import Step4PharmacyLicense from '../../components/auth/Registration/Step4PharmacyLicense'
 import Step5PharmacyQuestions from '../../components/auth/Registration/Step5PharmacyQuestions'
 import Step6ReferralInfo from '../../components/auth/Registration/Step6ReferralInfo'
-import Step7DocumentUpload from '../../components/auth/Registration/Step7DocumentUpload'
+import Step7BankAccount from '../../components/auth/Registration/Step7BankAccount'
+import Step8DocumentUpload from '../../components/auth/Registration/Step8DocumentUpload'
 import { Building2, CheckCircle } from 'lucide-react'
 
 const RegisterPage = () => {
@@ -29,7 +30,9 @@ const RegisterPage = () => {
       case 6:
         return <Step6ReferralInfo />
       case 7:
-        return <Step7DocumentUpload />
+        return <Step7BankAccount />
+      case 8:
+        return <Step8DocumentUpload />
       default:
         return <Step1PharmacyInfo />
     }
@@ -127,7 +130,7 @@ const RegisterPage = () => {
               </div>
             </div>
             <div className="text-sm text-gray-600">
-              Step {currentStep} of 7
+              Step {currentStep} of 8
             </div>
           </div>
         </div>

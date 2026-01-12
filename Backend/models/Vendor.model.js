@@ -1,5 +1,3 @@
-//vendor model
-
 import mongoose from 'mongoose';
 import validator from 'validator';
 import bcrypt from 'bcryptjs';
@@ -23,6 +21,119 @@ const pharmacyLicenseSchema = new mongoose.Schema({
   stateLicenseExpirationDate: {
     type: Date,
     required: [true, 'State license expiration date is required']
+  }
+});
+
+const bankAccountSchema = new mongoose.Schema({
+  accountHolderName: {
+    type: String,
+    required: [true, 'Account holder name is required'],
+    trim: true
+  },
+  bankName: {
+    type: String,
+    required: [true, 'Bank name is required'],
+    trim: true
+  },
+  accountType: {
+    type: String,
+    required: [true, 'Account type is required'],
+    enum: ['Checking', 'Savings', 'Business Checking', 'Business Savings'],
+    default: 'Checking'
+  },
+  routingNumber: {
+    type: String,
+    required: [true, 'Routing number is required'],
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return /^\d{9}$/.test(v);
+      },
+      message: 'Routing number must be 9 digits'
+    }
+  },
+  accountNumber: {
+    type: String,
+    required: [true, 'Account number is required'],
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return /^\d{10,17}$/.test(v);
+      },
+      message: 'Account number must be between 10-17 digits'
+    }
+  },
+  confirmationAccountNumber: {
+    type: String,
+    required: [true, 'Account number confirmation is required'],
+    trim: true,
+    validate: {
+      validator: function(v) {
+        return v === this.accountNumber;
+      },
+      message: 'Account numbers do not match'
+    }
+  },
+  bankAddress: {
+    line1: {
+      type: String,
+      required: [true, 'Bank address line 1 is required'],
+      trim: true
+    },
+    line2: {
+      type: String,
+      trim: true
+    },
+    city: {
+      type: String,
+      required: [true, 'City is required'],
+      trim: true
+    },
+    state: {
+      type: String,
+      required: [true, 'State is required'],
+      enum: [
+        'AL', 'AK', 'AZ', 'AR', 'CA', 'CO', 'CT', 'DE', 'FL', 'GA',
+        'HI', 'ID', 'IL', 'IN', 'IA', 'KS', 'KY', 'LA', 'ME', 'MD',
+        'MA', 'MI', 'MN', 'MS', 'MO', 'MT', 'NE', 'NV', 'NH', 'NJ',
+        'NM', 'NY', 'NC', 'ND', 'OH', 'OK', 'OR', 'PA', 'RI', 'SC',
+        'SD', 'TN', 'TX', 'UT', 'VT', 'VA', 'WA', 'WV', 'WI', 'WY'
+      ]
+    },
+    zipCode: {
+      type: String,
+      required: [true, 'Zip code is required'],
+      validate: {
+        validator: function(v) {
+          return /^\d{5}(-\d{4})?$/.test(v);
+        },
+        message: 'Please enter a valid zip code'
+      }
+    }
+  },
+  bankPhone: {
+    type: String,
+    required: [true, 'Bank phone number is required'],
+    validate: {
+      validator: function(v) {
+        return /^[\+]?[1-9][\d]{0,15}$/.test(v);
+      },
+      message: 'Please enter a valid phone number'
+    }
+  },
+  achAuthorization: {
+    type: Boolean,
+    required: [true, 'ACH authorization must be accepted'],
+    validate: {
+      validator: function(v) {
+        return v === true;
+      },
+      message: 'You must authorize ACH transactions'
+    }
+  },
+  authorizationDate: {
+    type: Date,
+    default: Date.now
   }
 });
 
@@ -325,7 +436,13 @@ const vendorSchema = new mongoose.Schema({
     }
   },
 
-  // Step 7: Documents
+  // Step 7: Bank Account Details (NEW STEP)
+  bankAccount: {
+    type: bankAccountSchema,
+    required: [true, 'Bank account information is required']
+  },
+
+  // Step 8: Documents (MOVED FROM STEP 7)
   documents: {
     type: [documentSchema],
     validate: {
@@ -389,7 +506,7 @@ vendorSchema.index({ registeredAt: -1 });
 
 // Hash password before saving
 vendorSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return "";
+  if (!this.isModified('password')) return ""; // next();
   
   try {
     const salt = await bcrypt.genSalt(10);
@@ -413,6 +530,20 @@ vendorSchema.methods.isApproved = function() {
 // Virtual for full name
 vendorSchema.virtual('pharmacyOwner.fullName').get(function() {
   return `${this.pharmacyOwner.firstName} ${this.pharmacyOwner.lastName}`;
+});
+
+// Virtual for masked account number (for display)
+vendorSchema.virtual('bankAccount.maskedAccountNumber').get(function() {
+  if (!this.bankAccount || !this.bankAccount.accountNumber) return null;
+  const accNum = this.bankAccount.accountNumber;
+  return `****${accNum.slice(-4)}`;
+});
+
+// Virtual for masked routing number (for display)
+vendorSchema.virtual('bankAccount.maskedRoutingNumber').get(function() {
+  if (!this.bankAccount || !this.bankAccount.routingNumber) return null;
+  const routingNum = this.bankAccount.routingNumber;
+  return `****${routingNum.slice(-4)}`;
 });
 
 const Vendor = mongoose.model('Vendor', vendorSchema);

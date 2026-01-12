@@ -17,6 +17,18 @@ export const vendorService = {
     return response.data
   },
 
+  // NEW: Bank account related endpoints
+  async updateBankAccount(bankAccountData) {
+    const response = await api.put('/vendors/bank-account', bankAccountData)
+    return response.data
+  },
+
+  async getBankAccount() {
+    const response = await api.get('/vendors/bank-account')
+    console.log('Bank account response:', response)
+    return response.data
+  },
+
   async uploadDocument(file, documentType) {
     const formData = new FormData()
     formData.append('document', file)

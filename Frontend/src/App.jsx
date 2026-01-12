@@ -47,6 +47,7 @@ import Contact from './pages/Contact'
 import ProtectedRoute from './components/common/ProtectedRoute'
 import VendorLayout from './components/layout/VendorLayout'
 import VendorOrderDetailsPage from './pages/vendor/VendorOrderDetailsPage'
+import StatusCheckRoute from './components/common/StatusCheckRoute'
 
 // Component to handle ProtectedSubHeader visibility
 const AppContent = () => {
@@ -76,9 +77,13 @@ const AppContent = () => {
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password/:token" element={<ResetPasswordPage />} />
 
-          <Route path="/pending-approval" element={<PendingApprovalPage />} />
+          {/* <Route path="/pending-approval" element={<PendingApprovalPage />} />
           <Route path="/account-rejected" element={<AccountRejectedPage />} />
-          <Route path="/account-suspended" element={<AccountSuspendedPage />} />
+          <Route path="/account-suspended" element={<AccountSuspendedPage />} /> */}
+
+          <Route path="/account-pending" element={<StatusCheckRoute status="pending"><PendingApprovalPage /></StatusCheckRoute>} />
+          <Route path="/account-rejected" element={<StatusCheckRoute status="rejected"><AccountRejectedPage /></StatusCheckRoute>} />
+          <Route path="/account-suspended" element={<StatusCheckRoute status="suspended"><AccountSuspendedPage /></StatusCheckRoute>} />
 
           {/* Info Pages */}
           <Route path="/how-it-works" element={<HowItWorks />} />

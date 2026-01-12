@@ -2,6 +2,7 @@ import Admin from '../models/Admin.model.js';
 import Token from '../models/Token.model.js';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
+import {clearAdminTokenCookie, setAdminTokenCookie} from '../utils/adminHelpers.js';
 
 // Helper functions
 const generateAdminToken = (adminId, role) => {
@@ -25,35 +26,6 @@ const generateAdminToken = (adminId, role) => {
   });
   
   return token;
-};
-
-const setAdminTokenCookie = (res, token) => {
-  const options = {
-    expires: new Date(
-      Date.now() + (process.env.JWT_COOKIE_EXPIRE || 8) * 60 * 60 * 1000
-    ),
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-    path: '/'
-  };
-
-  console.log('🍪 Setting admin_token cookie with options:', {
-    expires: options.expires,
-    httpOnly: options.httpOnly,
-    secure: options.secure,
-    sameSite: options.sameSite,
-    path: options.path
-  });
-
-  res.cookie('admin_token', token, {
-  httpOnly: true,
-  secure: true,        // REQUIRED on Render
-  sameSite: 'none',   // REQUIRED for cross-site
-  path: '/',
-  maxAge: 8 * 60 * 60 * 1000
-});
-
 };
 
 // @desc    Admin login

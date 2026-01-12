@@ -2,38 +2,14 @@
 import { api } from './api.js'
 
 export const authService = {
-  async login(email, password) {
-    const response = await api.post('/vendor/auth/login', { email, password })
-    
-    console.log('🔐 Login response:', response) // Debug log
-    
-    if (response.success) {
-      // ✅ Store token and vendor data properly
-      const vendorData = response.data
-      
-      // Check if token is in vendorData or response root
-      const token = vendorData.token || response.token
-      
-      if (token) {
-        localStorage.setItem('token', token)
-        console.log('✅ Token stored:', token.substring(0, 20) + '...')
-      }
-      
-      // Store vendor info
-      localStorage.setItem('vendorToken', 'true')
-      localStorage.setItem('vendorUser', JSON.stringify(vendorData))
-      localStorage.setItem('vendorId', vendorData._id || vendorData.id)
-      localStorage.setItem('vendorLastLogin', new Date().toISOString())
-      localStorage.setItem('vendorStatus', vendorData.status)
-      
-      console.log('✅ Vendor data stored:', {
-        id: vendorData._id,
-        name: vendorData.pharmacyInfo?.legalBusinessName,
-        status: vendorData.status
-      })
+  async login(credentials) {
+    try {
+      const response = await api.post('/vendor/auth/login', credentials);
+      return response;
+    } catch (error) {
+      // Re-throw the error with all the details
+      throw error;
     }
-    
-    return response.data
   },
 
   async logout() {

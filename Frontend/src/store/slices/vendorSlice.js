@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-import {vendorService} from '../../services/vendor.service'
+import { vendorService } from '../../services/vendor.service'
 
 export const fetchVendorProfile = createAsyncThunk(
   'vendor/fetchProfile',
@@ -74,10 +74,36 @@ export const fetchVendorOrderDetails = createAsyncThunk(
   }
 );
 
+// vendorSlice.js - Add these thunks
+export const fetchVendorBankAccount = createAsyncThunk(
+  'vendor/fetchBankAccount',
+  async (_, { rejectWithValue }) => {
+    try {
+      const data = await vendorService.getBankAccount()
+      return data
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message)
+    }
+  }
+);
+
+export const updateVendorBankAccount = createAsyncThunk(
+  'vendor/updateBankAccount',
+  async (bankData, { rejectWithValue }) => {
+    try {
+      const response = await api.put('/vendors/bank-account', bankData)
+      return response.data
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || error.message)
+    }
+  }
+);
+
 const initialState = {
   profile: null,
   isLoading: false,
   error: null,
+  bankAccount: null,
   updateSuccess: false,
   documents: [],
   stats: {
@@ -124,7 +150,7 @@ const vendorSlice = createSlice({
         state.isLoading = false
         state.error = action.payload
       })
-      
+
       // Update Profile
       .addCase(updateVendorProfile.pending, (state) => {
         state.isLoading = true
@@ -141,7 +167,7 @@ const vendorSlice = createSlice({
         state.error = action.payload
         state.updateSuccess = false
       })
-      
+
       // Upload Document
       .addCase(uploadDocument.pending, (state) => {
         state.isLoading = true
@@ -201,15 +227,44 @@ const vendorSlice = createSlice({
       .addCase(fetchVendorOrderDetails.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
-      });
+      })
+
+      // Add extra reducers
+      .addCase(fetchVendorBankAccount.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(fetchVendorBankAccount.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.bankAccount = action.payload.data.bankAccount
+      })
+
+      .addCase(fetchVendorBankAccount.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
+
+      // Add for update
+      .addCase(updateVendorBankAccount.pending, (state) => {
+        state.isLoading = true
+        state.error = null
+      })
+      .addCase(updateVendorBankAccount.fulfilled, (state, action) => {
+        state.isLoading = false
+        state.bankAccount = action.payload.data?.bankAccount
+      })
+      .addCase(updateVendorBankAccount.rejected, (state, action) => {
+        state.isLoading = false
+        state.error = action.payload
+      })
   }
 })
 
-export const { 
-  clearVendorError, 
-  clearUpdateSuccess, 
+export const {
+  clearVendorError,
+  clearUpdateSuccess,
   updateProfileField,
-  setStats 
+  setStats
 } = vendorSlice.actions
 
 export default vendorSlice.reducer

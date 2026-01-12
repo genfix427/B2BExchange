@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react'
 import { useSelector, useDispatch } from 'react-redux'
 import { useDropzone } from 'react-dropzone'
-import { Upload, FileText, CheckCircle, XCircle, AlertCircle } from 'lucide-react'
+import { Upload, FileText, CheckCircle, XCircle, AlertCircle, Lock, Mail, Key } from 'lucide-react'
 import { 
   registerVendor, 
   prevStep, 
@@ -10,7 +10,7 @@ import {
 } from '../../../store/slices/registrationSlice'
 import { DOCUMENT_TYPES, ALLOWED_FILE_TYPES, MAX_FILE_SIZE } from '../../../utils/constants'
 
-const Step7DocumentUpload = () => {
+const Step8DocumentUpload = () => {
   const dispatch = useDispatch()
   const { formData, isLoading, error } = useSelector((state) => state.registration)
   
@@ -123,7 +123,7 @@ const Step7DocumentUpload = () => {
     
     // Update documents metadata in store (NOT File objects)
     dispatch(updateFormData({
-      step: 7,
+      step: 8,
       data: documentFiles.map(doc => ({
         name: doc.file?.name || doc.type,
         size: doc.file?.size || 0,
@@ -142,7 +142,7 @@ const Step7DocumentUpload = () => {
   const handleBack = () => {
     // Save document metadata to store (NOT File objects)
     dispatch(updateFormData({
-      step: 7,
+      step: 8,
       data: documentFiles.map(doc => ({
         name: doc.file?.name || doc.type,
         size: doc.file?.size || 0,
@@ -165,10 +165,15 @@ const Step7DocumentUpload = () => {
   }, [documentFiles])
   
   const allDocumentsUploaded = documentFiles.every(doc => doc.file !== null && doc.error === null)
+  const allStepsCompleted = formData.pharmacyInfo && formData.pharmacyOwner && 
+    formData.primaryContact && formData.pharmacyLicense && 
+    formData.pharmacyQuestions && formData.referralInfo && 
+    formData.bankAccount && allDocumentsUploaded && 
+    authData.email && authData.password
   
   return (
     <div className="max-w-4xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 7: Document Upload & Account Creation</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 8: Document Upload & Account Creation</h2>
       
       {error && (
         <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
@@ -209,11 +214,15 @@ const Step7DocumentUpload = () => {
         
         {/* Account Creation */}
         <div className="border-t pt-8">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create Your Account</h3>
+          <div className="flex items-center mb-4">
+            <Lock className="h-5 w-5 text-gray-500 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">Create Your Account</h3>
+          </div>
           
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
+                <Mail className="inline h-4 w-4 mr-1" />
                 Login Email *
               </label>
               <input
@@ -231,6 +240,7 @@ const Step7DocumentUpload = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Key className="inline h-4 w-4 mr-1" />
                   Password *
                 </label>
                 <input
@@ -247,6 +257,7 @@ const Step7DocumentUpload = () => {
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <Key className="inline h-4 w-4 mr-1" />
                   Confirm Password *
                 </label>
                 <input
@@ -270,27 +281,31 @@ const Step7DocumentUpload = () => {
             <ul className="space-y-2 text-sm text-gray-600">
               <li className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Pharmacy Information: Completed
+                Pharmacy Information: {formData.pharmacyInfo ? '✓' : 'Pending'}
               </li>
               <li className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Pharmacy Owner: Completed
+                Pharmacy Owner: {formData.pharmacyOwner ? '✓' : 'Pending'}
               </li>
               <li className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Primary Contact: Completed
+                Primary Contact: {formData.primaryContact ? '✓' : 'Pending'}
               </li>
               <li className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Pharmacy License: Completed
+                Pharmacy License: {formData.pharmacyLicense ? '✓' : 'Pending'}
               </li>
               <li className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Pharmacy Questions: Completed
+                Pharmacy Questions: {formData.pharmacyQuestions ? '✓' : 'Pending'}
               </li>
               <li className="flex items-center">
                 <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
-                Referral Information: Completed
+                Referral Information: {formData.referralInfo ? '✓' : 'Pending'}
+              </li>
+              <li className="flex items-center">
+                <CheckCircle className="h-4 w-4 text-green-500 mr-2" />
+                Bank Account: {formData.bankAccount ? '✓' : 'Pending'}
               </li>
               <li className={`flex items-center ${allDocumentsUploaded ? 'text-green-600' : 'text-amber-600'}`}>
                 {allDocumentsUploaded ? (
@@ -298,7 +313,7 @@ const Step7DocumentUpload = () => {
                 ) : (
                   <AlertCircle className="h-4 w-4 text-amber-500 mr-2" />
                 )}
-                Documents: {allDocumentsUploaded ? 'Completed' : 'Pending'}
+                Documents: {allDocumentsUploaded ? '✓' : 'Pending'}
               </li>
             </ul>
             
@@ -325,7 +340,7 @@ const Step7DocumentUpload = () => {
           <button
             type="submit"
             onClick={handleSubmit}
-            disabled={isLoading || !allDocumentsUploaded}
+            disabled={isLoading || !allStepsCompleted}
             className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? (
@@ -438,4 +453,4 @@ const DocumentDropzone = ({ document, onDrop }) => {
   )
 }
 
-export default Step7DocumentUpload
+export default Step8DocumentUpload

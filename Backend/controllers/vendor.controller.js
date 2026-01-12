@@ -3,7 +3,7 @@ import { sendVendorRegistrationEmail } from '../services/email.service.js';
 import { uploadToCloudinary } from '../services/cloudinary.service.js';
 import { DOCUMENT_TYPES } from '../utils/constants.js';
 
-// @desc    Register vendor (7-step form submission)
+// @desc    Register vendor (8-step form submission)
 // @route   POST /api/vendors/register
 // @access  Public
 export const registerVendor = async (req, res, next) => {
@@ -18,6 +18,7 @@ export const registerVendor = async (req, res, next) => {
     const pharmacyLicense = req.body.pharmacyLicense ? JSON.parse(req.body.pharmacyLicense) : null;
     const pharmacyQuestions = req.body.pharmacyQuestions ? JSON.parse(req.body.pharmacyQuestions) : null;
     const referralInfo = req.body.referralInfo ? JSON.parse(req.body.referralInfo) : null;
+    const bankAccount = req.body.bankAccount ? JSON.parse(req.body.bankAccount) : null;
     const { email, password } = req.body;
 
     const documents = req.files || [];
@@ -26,12 +27,13 @@ export const registerVendor = async (req, res, next) => {
       email: email ? 'present' : 'missing',
       password: password ? 'present' : 'missing',
       pharmacyInfo: pharmacyInfo ? 'present' : 'missing',
+      bankAccount: bankAccount ? 'present' : 'missing',
       documentsCount: documents.length
     });
 
-    // Validate all required data is present
+    // Validate all required data is present (now 8 steps)
     if (!pharmacyInfo || !pharmacyOwner || !primaryContact || !pharmacyLicense || 
-        !pharmacyQuestions || !referralInfo || !email || !password) {
+        !pharmacyQuestions || !referralInfo || !bankAccount || !email || !password) {
       console.log('Missing required fields');
       return res.status(400).json({
         success: false,
@@ -102,6 +104,7 @@ export const registerVendor = async (req, res, next) => {
       pharmacyLicense,
       pharmacyQuestions,
       referralInfo,
+      bankAccount, // Added bank account details
       documents: uploadedDocuments,
       email,
       password,
@@ -141,16 +144,108 @@ export const registerVendor = async (req, res, next) => {
   }
 };
 
-// ... rest of the controller code remains the same
-
 // @desc    Get vendor profile
 // @route   GET /api/vendors/profile
 // @access  Private (Vendor)
 export const getVendorProfile = async (req, res, next) => {
   try {
     const vendor = await Vendor.findById(req.user.id)
-      .select('-password')
+      .select('-password -bankAccount.accountNumber -bankAccount.routingNumber')
       .populate('approvedBy', 'firstName lastName email');
+
+    if (!vendor) {
+      return res.status(404).json({
+        success: false,
+        message: 'Vendor not found'
+      });
+    }
+
+    const vendorData = vendor.toObject();
+
+    if (vendorData.bankAccount) {
+      vendorData.bankAccount = {
+        accountHolderName: vendorData.bankAccount.accountHolderName,
+        bankName: vendorData.bankAccount.bankName,
+        accountType: vendorData.bankAccount.accountType,
+
+        // ✅ dynamically masked
+        maskedAccountNumber: vendor.bankAccount.accountNumber
+          ? `****${vendor.bankAccount.accountNumber.slice(-4)}`
+          : null,
+
+        maskedRoutingNumber: vendor.bankAccount.routingNumber
+          ? `****${vendor.bankAccount.routingNumber.slice(-4)}`
+          : null,
+
+        bankAddress: vendorData.bankAccount.bankAddress,
+        bankPhone: vendorData.bankAccount.bankPhone,
+        achAuthorization: vendorData.bankAccount.achAuthorization,
+        authorizationDate: vendorData.bankAccount.authorizationDate
+      };
+    }
+
+    res.status(200).json({
+      success: true,
+      data: vendorData
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+
+// @desc    Update vendor profile (including bank account)
+// @route   PUT /api/vendors/profile
+// @access  Private (Vendor)
+export const updateVendorProfile = async (req, res, next) => {
+  try {
+    const { pharmacyInfo, pharmacyOwner, primaryContact, pharmacyQuestions, bankAccount } = req.body;
+    
+    const updateData = {};
+    
+    if (pharmacyInfo) updateData.pharmacyInfo = pharmacyInfo;
+    if (pharmacyOwner) updateData.pharmacyOwner = pharmacyOwner;
+    if (primaryContact) updateData.primaryContact = primaryContact;
+    if (pharmacyQuestions) updateData.pharmacyQuestions = pharmacyQuestions;
+    if (bankAccount) updateData.bankAccount = bankAccount;
+    
+    updateData.profileCompleted = true;
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      req.user.id,
+      updateData,
+      { new: true, runValidators: true }
+    ).select('-password -bankAccount.accountNumber -bankAccount.confirmationAccountNumber -bankAccount.routingNumber');
+
+    res.status(200).json({
+      success: true,
+      message: 'Profile updated successfully',
+      data: vendor
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update vendor bank account details
+// @route   PUT /api/vendors/bank-account
+// @access  Private (Vendor)
+export const updateBankAccount = async (req, res, next) => {
+  try {
+    const { bankAccount } = req.body;
+
+    if (!bankAccount) {
+      return res.status(400).json({
+        success: false,
+        message: 'Bank account details are required'
+      });
+    }
+
+    const vendor = await Vendor.findByIdAndUpdate(
+      req.user.id,
+      { bankAccount },
+      { new: true, runValidators: true }
+    ).select('-password -bankAccount.accountNumber -bankAccount.confirmationAccountNumber -bankAccount.routingNumber');
 
     if (!vendor) {
       return res.status(404).json({
@@ -161,39 +256,57 @@ export const getVendorProfile = async (req, res, next) => {
 
     res.status(200).json({
       success: true,
-      data: vendor
+      message: 'Bank account updated successfully',
+      data: {
+        bankAccount: {
+          accountHolderName: vendor.bankAccount.accountHolderName,
+          bankName: vendor.bankAccount.bankName,
+          accountType: vendor.bankAccount.accountType,
+          maskedAccountNumber: vendor.bankAccount.maskedAccountNumber,
+          maskedRoutingNumber: vendor.bankAccount.maskedRoutingNumber,
+          bankAddress: vendor.bankAccount.bankAddress,
+          bankPhone: vendor.bankAccount.bankPhone,
+          achAuthorization: vendor.bankAccount.achAuthorization,
+          authorizationDate: vendor.bankAccount.authorizationDate
+        }
+      }
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Update vendor profile
-// @route   PUT /api/vendors/profile
+// @desc    Get vendor bank account details (masked for security)
+// @route   GET /api/vendors/bank-account
 // @access  Private (Vendor)
-export const updateVendorProfile = async (req, res, next) => {
+export const getBankAccount = async (req, res, next) => {
   try {
-    const { pharmacyInfo, pharmacyOwner, primaryContact, pharmacyQuestions } = req.body;
-    
-    const updateData = {};
-    
-    if (pharmacyInfo) updateData.pharmacyInfo = pharmacyInfo;
-    if (pharmacyOwner) updateData.pharmacyOwner = pharmacyOwner;
-    if (primaryContact) updateData.primaryContact = primaryContact;
-    if (pharmacyQuestions) updateData.pharmacyQuestions = pharmacyQuestions;
-    
-    updateData.profileCompleted = true;
+    const vendor = await Vendor.findById(req.user.id)
+      .select('bankAccount');
 
-    const vendor = await Vendor.findByIdAndUpdate(
-      req.user.id,
-      updateData,
-      { new: true, runValidators: true }
-    ).select('-password');
+    if (!vendor || !vendor.bankAccount) {
+      return res.status(404).json({
+        success: false,
+        message: 'Bank account not found'
+      });
+    }
 
+    // Return masked account details for security
     res.status(200).json({
       success: true,
-      message: 'Profile updated successfully',
-      data: vendor
+      data: {
+        bankAccount: {
+          accountHolderName: vendor.bankAccount.accountHolderName,
+          bankName: vendor.bankAccount.bankName,
+          accountType: vendor.bankAccount.accountType,
+          maskedAccountNumber: vendor.bankAccount.maskedAccountNumber,
+          maskedRoutingNumber: vendor.bankAccount.maskedRoutingNumber,
+          bankAddress: vendor.bankAccount.bankAddress,
+          bankPhone: vendor.bankAccount.bankPhone,
+          achAuthorization: vendor.bankAccount.achAuthorization,
+          authorizationDate: vendor.bankAccount.authorizationDate
+        }
+      }
     });
   } catch (error) {
     next(error);

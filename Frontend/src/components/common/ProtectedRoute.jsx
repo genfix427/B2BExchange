@@ -11,15 +11,22 @@ const ProtectedRoute = ({ children, requireApprovedVendor = true }) => {
 
   // ✅ Only block THIS route, not the whole app
   if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <LoadingSpinner size="md" />
-      </div>
-    )
-  }
+  return <LoadingSpinner />
+}
+
+// ⛔ HARD STOP — prevents flash
+if (user && user.role === 'vendor' && user.status !== 'approved') {
+  return null
+}
+
+if (!isAuthenticated || !user) {
+  return <Navigate to="/login" replace />
+}
+
 
   // ❌ Not logged in
   if (!isAuthenticated || !user) {
+    // Store the attempted URL for redirect after login
     return (
       <Navigate
         to="/login"
@@ -38,13 +45,19 @@ const ProtectedRoute = ({ children, requireApprovedVendor = true }) => {
 
     // ❌ Vendor exists but not approved
     if (user.status !== 'approved') {
+      // Store the original attempted path
+      const redirectState = { 
+        from: location.pathname,
+        status: user.status 
+      }
+      
       switch (user.status) {
         case 'pending':
-          return <Navigate to="/pending-approval" replace />
+          return <Navigate to="/account-pending" state={redirectState} replace />
         case 'rejected':
-          return <Navigate to="/account-rejected" replace />
+          return <Navigate to="/account-rejected" state={redirectState} replace />
         case 'suspended':
-          return <Navigate to="/account-suspended" replace />
+          return <Navigate to="/account-suspended" state={redirectState} replace />
         default:
           return <Navigate to="/login" replace />
       }

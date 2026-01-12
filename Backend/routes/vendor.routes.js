@@ -2,7 +2,9 @@ import express from 'express';
 import {
   registerVendor,
   getVendorProfile,
-  updateVendorProfile
+  updateVendorProfile,
+  updateBankAccount,
+  getBankAccount
 } from '../controllers/vendor.controller.js';
 import { uploadDocuments, handleUploadError } from '../middleware/upload.middleware.js';
 import { validateRegistration } from '../middleware/validation.middleware.js';
@@ -42,9 +44,13 @@ router.post('/register-test', uploadDocuments, handleUploadError, (req, res) => 
 // Protected vendor routes
 router.use(protect);
 router.use(vendorOnly);
-router.use(checkVendorApproved);
 
 router.get('/profile', getVendorProfile);
 router.put('/profile', updateVendorProfile);
+
+router.put('/bank-account', protect, vendorOnly, updateBankAccount);
+router.get('/bank-account', protect, vendorOnly, getBankAccount);
+
+router.use(checkVendorApproved);
 
 export default router;

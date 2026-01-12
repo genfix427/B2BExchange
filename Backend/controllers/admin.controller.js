@@ -309,9 +309,6 @@ export const getPendingVendors = async (req, res, next) => {
   }
 };
 
-// @desc    Get vendor details
-// @route   GET /api/admin/vendors/:id
-// @access  Private (Admin)
 export const getVendorDetails = async (req, res, next) => {
   try {
     const vendor = await Vendor.findById(req.params.id)
@@ -325,14 +322,58 @@ export const getVendorDetails = async (req, res, next) => {
       });
     }
 
+    const vendorData = vendor.toObject();
+    const isAdmin = req.user?.role === 'admin';
+
+    if (vendorData.bankAccount) {
+      const {
+        accountHolderName,
+        bankName,
+        accountType,
+        routingNumber,
+        accountNumber,
+        bankAddress,
+        bankPhone,
+        achAuthorization,
+        authorizationDate
+      } = vendorData.bankAccount;
+
+      vendorData.bankAccount = {
+        accountHolderName,
+        bankName,
+        accountType,
+
+        // ✅ always send masked
+        maskedRoutingNumber: routingNumber
+          ? `****${routingNumber.slice(-4)}`
+          : null,
+
+        maskedAccountNumber: accountNumber
+          ? `****${accountNumber.slice(-4)}`
+          : null,
+
+        // ✅ send raw ONLY to admin
+        ...(isAdmin && {
+          routingNumber,
+          accountNumber
+        }),
+
+        bankAddress,
+        bankPhone,
+        achAuthorization,
+        authorizationDate
+      };
+    }
+
     res.status(200).json({
       success: true,
-      data: vendor
+      data: vendorData
     });
   } catch (error) {
     next(error);
   }
 };
+
 
 // @desc    Approve vendor
 // @route   PUT /api/admin/vendors/:id/approve

@@ -81,7 +81,16 @@ schedulerService.init();
 /* =========================
    BODY PARSERS
 ========================= */
-app.use(express.json({ limit: '50mb' }));
+app.use((req, res, next) => {
+  const contentType = req.headers['content-type'] || '';
+
+  if (contentType.includes('multipart/form-data')) {
+    return next();
+  }
+
+  express.json({ limit: '50mb' })(req, res, next);
+});
+
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 /* =========================

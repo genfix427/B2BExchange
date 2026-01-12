@@ -30,7 +30,8 @@ import {
   Users as UsersIcon,
   BarChart,
   History as HistoryIcon,
-  Briefcase
+  Briefcase,
+  Banknote
 } from 'lucide-react'
 
 // Import tab components
@@ -62,6 +63,7 @@ import { fetchVendorProducts } from '../../store/slices/adminProductSlice'
 
 // Import date formatting
 import { format } from 'date-fns'
+import BankDetailsTab from '../../components/VendorDetails/BankDetailsTab'
 
 const VendorDetailPage = () => {
   const { id } = useParams()
@@ -347,6 +349,7 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
             { id: 'documents', label: 'Documents', icon: FileText, badge: documents.length },
             { id: 'licenses', label: 'Licenses', icon: Shield, badge: licenses.length },
             { id: 'contacts', label: 'Contacts', icon: UsersIcon },
+            { id: 'bank', label: 'Bank Account', icon: Banknote, hasBankAccount: !!selectedVendor.bankAccount },
             { id: 'products', label: 'Products', icon: Package, badge: getProductsCount() },
             { id: 'orders', label: 'Orders', icon: ShoppingCart },
             { id: 'analytics', label: 'Analytics', icon: BarChart },
@@ -407,6 +410,9 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
         {activeTab === 'contacts' && (
           <ContactsTab vendor={selectedVendor} />
         )}
+        {activeTab === 'bank' && (
+          <BankDetailsTab vendor={selectedVendor} />
+        )}
 
         {activeTab === 'products' && (
           <ProductsTab vendor={selectedVendor} />
@@ -424,6 +430,23 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
           <HistoryTab vendor={selectedVendor} />
         )}
       </div>
+
+      <div className="bg-white rounded-lg shadow p-4">
+  <div className="flex items-center">
+    <div className="p-2 bg-teal-100 rounded-lg">
+      <Banknote className="w-6 h-6 text-teal-600" />
+    </div>
+    <div className="ml-3">
+      <p className="text-sm font-medium text-gray-600">Bank Account</p>
+      <p className="text-sm font-bold text-gray-900">
+        {selectedVendor.bankAccount ? 'Configured' : 'Not Setup'}
+      </p>
+      {selectedVendor.bankAccount?.achAuthorization && (
+        <span className="text-xs text-emerald-600">ACH Active</span>
+      )}
+    </div>
+  </div>
+  </div>
 
       {/* Modals */}
       <RejectModal

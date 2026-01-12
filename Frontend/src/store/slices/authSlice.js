@@ -4,25 +4,38 @@ import { ApiError } from '../../services/api'
 
 export const login = createAsyncThunk(
   'auth/login',
-  async ({ email, password }, { rejectWithValue }) => {
+  async (credentials, { rejectWithValue }) => {
     try {
-      const data = await authService.login(email, password)
-      return data
+      const response = await authService.login(credentials)
+      return response.data
     } catch (error) {
-      if (error instanceof ApiError && error.statusCode === 403) {
+      // Log the full error for debugging
+      console.error('Login thunk error:', error)
+      
+      // Check if it's an ApiError with status information
+      if (error.data?.data?.status) {
         return rejectWithValue({
-          isStatusError: true,
-          status: error.data?.data?.status, // ✅ FIX
-          rejectionReason: error.data?.data?.rejectionReason,
-          suspensionReason: error.data?.data?.suspensionReason,
-          message: error.message
+          message: error.message,
+          status: error.data.data.status,
+          rejectionReason: error.data.data.rejectionReason,
+          suspensionReason: error.data.data.suspensionReason,
+          isStatusError: true
         })
       }
-
-      return rejectWithValue({
-        isStatusError: false,
-        message: error.message || 'Login failed'
-      })
+      
+      // Check if status is at root level
+      if (error.data?.status) {
+        return rejectWithValue({
+          message: error.message,
+          status: error.data.status,
+          rejectionReason: error.data.rejectionReason,
+          suspensionReason: error.data.suspensionReason,
+          isStatusError: true
+        })
+      }
+      
+      // For other errors
+      return rejectWithValue(error.message || 'Login failed')
     }
   }
 )
@@ -129,12 +142,20 @@ const authSlice = createSlice({
         state.error = null
       })
       .addCase(login.fulfilled, (state, action) => {
-        state.isLoading = false
-        state.isAuthenticated = true
-        state.user = action.payload
-        state.userType = 'vendor'
-        state.error = null
-      })
+  state.isLoading = false
+
+  const vendor = action.payload
+  const status = vendor.status
+
+  state.user = vendor
+  state.userType = 'vendor'
+
+  // ✅ ONLY approved vendors are authenticated
+  state.isAuthenticated = status === 'approved'
+
+  state.error = null
+})
+
       .addCase(login.rejected, (state, action) => {
         state.isLoading = false
 

@@ -1,5 +1,4 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit'
-// Remove vendorService import since we'll handle API call differently
 
 export const registerVendor = createAsyncThunk(
   'registration/registerVendor',
@@ -16,7 +15,7 @@ export const registerVendor = createAsyncThunk(
       // Create FormData for file upload
       const formDataToSend = new FormData()
       
-      // Add JSON data (stringify each object)
+      // Add JSON data (stringify each object) - Updated for 8 steps
       if (formData.pharmacyInfo) {
         formDataToSend.append('pharmacyInfo', JSON.stringify(formData.pharmacyInfo))
       }
@@ -34,6 +33,10 @@ export const registerVendor = createAsyncThunk(
       }
       if (formData.referralInfo) {
         formDataToSend.append('referralInfo', JSON.stringify(formData.referralInfo))
+      }
+      // NEW: Add bank account data
+      if (formData.bankAccount) {
+        formDataToSend.append('bankAccount', JSON.stringify(formData.bankAccount))
       }
       
       formDataToSend.append('email', formData.email)
@@ -90,7 +93,9 @@ const initialState = {
     pharmacyQuestions: null,
     // Step 6
     referralInfo: null,
-    // Step 7 - Only store metadata, NOT File objects
+    // Step 7: NEW - Bank Account Details
+    bankAccount: null,
+    // Step 8: Documents - Only store metadata, NOT File objects
     documents: [],
     // Auth
     email: '',
@@ -100,7 +105,6 @@ const initialState = {
   error: null,
   registrationComplete: false,
   registrationId: null
-  // REMOVED: documentFiles from state
 }
 
 const registrationSlice = createSlice({
@@ -111,7 +115,7 @@ const registrationSlice = createSlice({
       state.currentStep = action.payload
     },
     nextStep: (state) => {
-      if (state.currentStep < 7) {
+      if (state.currentStep < 8) { // Updated from 7 to 8
         state.currentStep += 1
       }
     },
@@ -141,7 +145,10 @@ const registrationSlice = createSlice({
         case 6:
           state.formData.referralInfo = data
           break
-        case 7:
+        case 7: // NEW: Bank Account
+          state.formData.bankAccount = data
+          break
+        case 8: // UPDATED: Documents from step 7 to 8
           // Only store metadata, NOT File objects
           if (Array.isArray(data)) {
             state.formData.documents = data.map(doc => ({

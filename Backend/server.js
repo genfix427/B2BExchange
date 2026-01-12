@@ -40,6 +40,7 @@ import errorHandler from './middleware/error.middleware.js';
 import connectDB from './config/db.js';
 
 const app = express();
+app.set('trust proxy', 1);
 
 /* =========================
    CORS CONFIG (ONLY ONCE)
@@ -73,8 +74,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
-app.set('trust proxy', 1);
 
 schedulerService.init();
 
@@ -111,7 +110,6 @@ const authLimiter = rateLimit({
 
 // app.use('/api/auth', authLimiter);
 app.use('/api/vendor/auth', authRoutes);
-app.use('/api/admin', authLimiter);
 app.use('/api/admin/auth', adminAuthRoutes);
 
 app.use('/api/vendor/products', vendorProductRoutes);

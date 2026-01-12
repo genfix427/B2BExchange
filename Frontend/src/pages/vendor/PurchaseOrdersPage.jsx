@@ -21,6 +21,9 @@ import { fetchOrders, selectCustomerOrders } from '../../store/slices/storeSlice
 
 const PurchaseOrdersPage = () => {
   const dispatch = useDispatch();
+  const { isAuthenticated, isLoading, user } = useSelector(
+      (state) => state.auth
+    );
   const { orders, loading } = useSelector((state) => state.store);
   const customerOrders = useSelector(selectCustomerOrders);
   const [filters, setFilters] = useState({
@@ -32,6 +35,7 @@ const PurchaseOrdersPage = () => {
 
   useEffect(() => {
     dispatch(fetchOrders(filters));
+    console.log('Fetching purchase orders with filters:', filters);
   }, [dispatch, filters]);
 
   const getStatusBadge = (status) => {
@@ -135,7 +139,7 @@ const PurchaseOrdersPage = () => {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 py-10 px-5">
       {/* Header */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between">

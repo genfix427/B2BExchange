@@ -45,7 +45,7 @@ export const vendorService = {
 
   async getVendorOrders(params = {}) {
     const query = new URLSearchParams(params).toString();
-    return api.get(`/vendor/orders${query ? `?${query}` : ''}`);
+    return await api.get(`/vendor/orders${query ? `?${query}` : ''}`);
   },
 
   // Update order status

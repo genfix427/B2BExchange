@@ -87,7 +87,7 @@ export const createOrder = async (req, res, next) => {
     const { paymentMethod, notes } = req.body;
     
     // ✅ Get vendor info (who is buying)
-    const customer = await Vendor.findById(req.user.id).session(session);
+    const customer = await Vendor.findById(req.vendor._id).session(session);
     
     if (!customer) {
       await session.abortTransaction();
@@ -99,7 +99,7 @@ export const createOrder = async (req, res, next) => {
     }
     
     // Get cart with populated product info
-    const cart = await Cart.findOne({ customer: req.user.id })
+    const cart = await Cart.findOne({ customer: req.vendor._id })
       .populate('items.product')
       .session(session);
     
@@ -241,7 +241,7 @@ export const createOrder = async (req, res, next) => {
     // ✅ Create order
     const order = new Order({
       orderNumber,
-      customer: req.user.id, // This is the BUYER vendor ID
+      customer: req.vendor._id, // This is the BUYER vendor ID
       customerName: customer.pharmacyInfo?.legalBusinessName || customer.pharmacyInfo?.dba || 'Unknown Vendor',
       customerEmail: customer.email,
       customerPhone: customer.pharmacyInfo?.phone || '',
@@ -262,7 +262,7 @@ export const createOrder = async (req, res, next) => {
     
     // Clear cart
     await Cart.findOneAndUpdate(
-      { customer: req.user.id },
+      { customer: req.vendor._id },
       { $set: { items: [], itemCount: 0, total: 0 } },
       { session, new: true }
     );
@@ -313,7 +313,7 @@ export const getOrders = async (req, res, next) => {
     const skip = (page - 1) * limit;
     
     // ✅ CRITICAL FIX: Find orders where this vendor is the CUSTOMER (buyer)
-    const query = { customer: req.user.id };
+    const query = { customer: req.vendor._id };
     
     if (status) {
       query.status = status;
@@ -357,7 +357,7 @@ export const getOrder = async (req, res, next) => {
     // ✅ Find order where this vendor is the CUSTOMER (buyer)
     const order = await Order.findOne({
       _id: req.params.id,
-      customer: req.user.id
+      customer: req.vendor._id
     })
     .populate('items.product', 'productName ndcNumber strength dosageForm manufacturer image')
     .populate('vendorOrders.vendor', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email pharmacyInfo.phone');

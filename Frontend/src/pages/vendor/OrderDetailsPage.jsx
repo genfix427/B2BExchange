@@ -58,13 +58,31 @@ const OrderDetailsPage = () => {
     }).format(price || 0);
   };
 
-  if (loading || !order) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
+  if (loading) {
+  return (
+    <div className="flex justify-center items-center h-64">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+    </div>
+  );
+}
+
+if (!order) {
+  return (
+    <div className="text-center py-12">
+      <h2 className="text-xl font-semibold text-gray-900">
+        Order not found
+      </h2>
+      <Link
+        to="/store/orders"
+        className="mt-4 inline-flex items-center text-blue-600 hover:text-blue-800"
+      >
+        <ArrowLeft className="w-4 h-4 mr-1" />
+        Back to Orders
+      </Link>
+    </div>
+  );
+}
+
 
   return (
     <div className="space-y-6">

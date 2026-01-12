@@ -91,7 +91,7 @@ export const updateVendorBankAccount = createAsyncThunk(
   'vendor/updateBankAccount',
   async (bankData, { rejectWithValue }) => {
     try {
-      const response = await api.put('/vendors/bank-account', bankData)
+      const response = await vendorService.updateBankAccount(bankData);
       return response.data
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || error.message)
@@ -105,6 +105,8 @@ const initialState = {
   error: null,
   bankAccount: null,
   updateSuccess: false,
+  vendorOrders: [],
+  currentVendorOrder: null,
   documents: [],
   stats: {
     totalOrders: 0,

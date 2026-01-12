@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom'
 import { useSelector, useDispatch } from 'react-redux'
 
 // Layout
@@ -49,13 +49,21 @@ import VendorLayout from './components/layout/VendorLayout'
 import VendorOrderDetailsPage from './pages/vendor/VendorOrderDetailsPage'
 import StatusCheckRoute from './components/common/StatusCheckRoute'
 
+const StoreOrdersLayout = () => {
+  return (
+    <ProtectedRoute requireApprovedVendor={false}>
+      <Outlet />
+    </ProtectedRoute>
+  )
+}
+
 // Component to handle ProtectedSubHeader visibility
 const AppContent = () => {
   const { user } = useSelector((state) => state.auth)
   const location = useLocation()
-  
+
   // Show ProtectedSubHeader on all protected routes except auth pages
-  const showProtectedSubHeader = user && 
+  const showProtectedSubHeader = user &&
     !location.pathname.startsWith('/login') &&
     !location.pathname.startsWith('/register') &&
     !location.pathname.startsWith('/forgot-password') &&
@@ -131,20 +139,11 @@ const AppContent = () => {
               </ProtectedRoute>
             }
           />
-          
-          <Route
-            path="/store/orders/*"
-            element={
-              <ProtectedRoute>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                  <Routes>
-                    <Route index element={<PurchaseOrdersPage />} />
-                    <Route path=":id" element={<OrderDetailsPage />} />
-                  </Routes>
-                </div>
-              </ProtectedRoute>
-            }
-          />
+
+          <Route path="/store/orders" element={<StoreOrdersLayout />}>
+  <Route index element={<PurchaseOrdersPage />} />
+  <Route path=":id" element={<OrderDetailsPage />} />
+</Route>
 
           {/* Legacy Routes - Redirect to new structure */}
           <Route path="/dashboard" element={<Navigate to="/vendor/dashboard" replace />} />
@@ -162,7 +161,7 @@ const AppContent = () => {
 const App = () => {
   const cart = useSelector((state) => state.store?.cart || { items: [], itemCount: 0, total: 0 })
   const wishlist = useSelector((state) => state.store?.wishlist || { products: [] })
-  
+
   const [showCart, setShowCart] = useState(false)
   const [showWishlist, setShowWishlist] = useState(false)
 
@@ -172,7 +171,7 @@ const App = () => {
       setShowWishlist(false)
       setShowCart(true)
     }
-    
+
     const handleToggleWishlist = () => {
       setShowCart(false)
       setShowWishlist(true)
@@ -205,14 +204,14 @@ const App = () => {
   return (
     <Router>
       <AppContent />
-      
+
       {/* Global Sidebars */}
-      <CartSidebar 
+      <CartSidebar
         isOpen={showCart}
         onClose={handleCloseCart}
       />
-      
-      <WishlistSidebar 
+
+      <WishlistSidebar
         isOpen={showWishlist}
         onClose={handleCloseWishlist}
       />

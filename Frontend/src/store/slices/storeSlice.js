@@ -507,9 +507,10 @@ const storeSlice = createSlice({
       
       // ✅ FIXED: Fetch Order Details for Customer
       .addCase(fetchOrderDetails.pending, (state) => {
-        state.loading = true;
-        state.error = null;
-      })
+  state.loading = true;
+  state.error = null;
+  state.orders.currentOrder = null; // 🔥 ADD THIS
+})
       .addCase(fetchOrderDetails.fulfilled, (state, action) => {
         state.loading = false;
         state.orders.currentOrder = action.payload;

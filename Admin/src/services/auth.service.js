@@ -93,11 +93,11 @@ export const authService = {
   },
 
   // Check if we have valid cookies
-  checkCookies() {
-    return {
-      hasAdminToken: cookieHelper.hasAdminToken(),
-      adminToken: cookieHelper.getAdminToken(),
-      allCookies: document.cookie
-    }
-  }
+  // checkCookies() {
+  //   return {
+  //     hasAdminToken: cookieHelper.hasAdminToken(),
+  //     adminToken: cookieHelper.getAdminToken(),
+  //     allCookies: document.cookie
+  //   }
+  // }
 }

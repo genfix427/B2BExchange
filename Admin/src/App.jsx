@@ -12,13 +12,13 @@ import AdminDashboardPage from './pages/dashboard/AdminDashboardPage'
 import VendorApprovalPage from './pages/dashboard/VendorApprovalPage'
 import VendorManagementPage from './pages/dashboard/VendorManagementPage'
 import VendorDetailPage from './pages/dashboard/VendorDetailPage'
-import AnalyticsPage from './pages/analytics/AnalyticsPage'
 import AdminSettingsPage from './pages/settings/AdminSettingsPage'
 import NotFoundPage from './pages/NotFoundPage'
 
 // Components
 import AdminProtectedRoute from './components/auth/ProtectedRoute'
 import AdminOrdersPage from './pages/dashboard/AdminOrdersPage'
+import AdminAnalyticsPage from './pages/dashboard/AdminAnalyticsPage'
 
 const App = () => {
   // const dispatch = useDispatch()
@@ -48,7 +48,7 @@ const App = () => {
           <Route path="vendors/pending" element={<VendorApprovalPage />} />
           <Route path="vendors" element={<VendorManagementPage />} />
           <Route path="vendors/:id" element={<VendorDetailPage />} />
-          <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="analytics" element={<AdminAnalyticsPage />} />
           <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
         </Route>

@@ -6,6 +6,7 @@ import adminAuthReducer from './slices/adminAuthSlice'
 import vendorReducer from './slices/vendorSlice'
 import adminProductReducer from './slices/adminProductSlice';
 import orderReducer from './slices/orderSlice';
+import vendorAnalyticsReducer from './slices/vendorAnalyticsSlice';
 
 const persistConfig = {
   key: 'adminRoot',
@@ -18,6 +19,7 @@ const rootReducer = combineReducers({
   vendors: vendorReducer,
   adminProducts: adminProductReducer,
   orders: orderReducer,
+  vendorAnalytics: vendorAnalyticsReducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

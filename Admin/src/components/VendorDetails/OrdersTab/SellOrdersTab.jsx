@@ -4,7 +4,7 @@ import {
   fetchVendorSellOrders,
   updateOrderStatus,
   generateInvoice,
-  setSellOrdersPage
+  setVendorSellOrdersPage
 } from '../../../store/slices/orderSlice';
 import {
   Search,
@@ -22,14 +22,17 @@ import {
   Calendar,
   Clock,
   DollarSign,
-  ShoppingBag
+  ShoppingBag,
+  RefreshCw,
+  FileText,
+  User
 } from 'lucide-react';
 import { format } from 'date-fns';
 import StatusBadge from './StatusBadge';
 
 const SellOrdersTab = ({ vendor }) => {
   const dispatch = useDispatch();
-  const { sellOrders, statusUpdate } = useSelector((state) => state.orders);
+  const { vendorSellOrders, statusUpdate } = useSelector((state) => state.orders);
   
   const [filters, setFilters] = useState({
     status: '',
@@ -45,6 +48,7 @@ const SellOrdersTab = ({ vendor }) => {
     trackingNumber: '',
     carrier: ''
   });
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const statusOptions = [
     { value: '', label: 'All Status' },
@@ -68,56 +72,108 @@ const SellOrdersTab = ({ vendor }) => {
 
   useEffect(() => {
     if (vendor?._id) {
-      dispatch(fetchVendorSellOrders({
+      loadVendorSellOrders();
+    }
+  }, [dispatch, vendor?._id, vendorSellOrders.page, filters]);
+
+  const loadVendorSellOrders = async () => {
+    if (!vendor?._id) return;
+    
+    try {
+      await dispatch(fetchVendorSellOrders({
         vendorId: vendor._id,
         params: {
-          page: sellOrders.page,
+          page: vendorSellOrders.page || 1,
           limit: 10,
           ...filters
         }
       }));
+    } catch (error) {
+      console.error('Error loading vendor sell orders:', error);
     }
-  }, [dispatch, vendor?._id, sellOrders.page, filters]);
+  };
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await loadVendorSellOrders();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
     }));
-    dispatch(setSellOrdersPage(1));
+    dispatch(setVendorSellOrdersPage(1));
   };
 
   const handleStatusUpdate = async () => {
     if (!statusModal.orderId) return;
     
-    await dispatch(updateOrderStatus({
-      orderId: statusModal.orderId,
-      data: {
-        status: statusModal.newStatus,
-        trackingNumber: statusModal.trackingNumber,
-        carrier: statusModal.carrier
-      }
-    }));
-    
-    setStatusModal({ show: false, orderId: null, newStatus: '', trackingNumber: '', carrier: '' });
-    dispatch(fetchVendorSellOrders({
-      vendorId: vendor._id,
-      params: { page: sellOrders.page, limit: 10, ...filters }
-    }));
+    try {
+      await dispatch(updateOrderStatus({
+        orderId: statusModal.orderId,
+        data: {
+          status: statusModal.newStatus,
+          trackingNumber: statusModal.trackingNumber,
+          carrier: statusModal.carrier
+        }
+      }));
+      
+      setStatusModal({ show: false, orderId: null, newStatus: '', trackingNumber: '', carrier: '' });
+      loadVendorSellOrders();
+    } catch (error) {
+      console.error('Error updating order status:', error);
+    }
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= sellOrders.pages) {
-      dispatch(setSellOrdersPage(newPage));
+    if (newPage >= 1 && newPage <= (vendorSellOrders.pages || 1)) {
+      dispatch(setVendorSellOrdersPage(newPage));
     }
   };
 
   const formatCurrency = (amount) => {
+    if (!amount) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: 'USD'
     }).format(amount);
   };
+
+  const formatDate = (date) => {
+    if (!date) return 'N/A';
+    return format(new Date(date), 'MMM d, yyyy');
+  };
+
+  const formatDateTime = (date) => {
+    if (!date) return 'N/A';
+    return format(new Date(date), 'MMM d, yyyy h:mm a');
+  };
+
+  // Calculate summary stats
+  const calculateSummaryStats = () => {
+    const orders = vendorSellOrders.data || [];
+    
+    const totalRevenue = orders.reduce((sum, order) => sum + (order.total || 0), 0);
+    const deliveredCount = orders.filter(o => o.status === 'delivered').length;
+    const pendingCount = orders.filter(o => o.status === 'pending').length;
+    const shippedCount = orders.filter(o => o.status === 'shipped').length;
+    
+    return {
+      totalOrders: orders.length,
+      totalRevenue,
+      deliveredCount,
+      pendingCount,
+      shippedCount,
+      avgOrderValue: orders.length > 0 ? totalRevenue / orders.length : 0
+    };
+  };
+
+  const summaryStats = calculateSummaryStats();
 
   return (
     <div className="p-6">
@@ -126,15 +182,16 @@ const SellOrdersTab = ({ vendor }) => {
         <div className="flex justify-between items-center">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">Sell Orders</h2>
-            <p className="text-sm text-gray-500">Orders where {vendor.pharmacyInfo?.legalBusinessName} is the seller</p>
+            <p className="text-sm text-gray-500">Orders where {vendor?.pharmacyInfo?.legalBusinessName || 'this vendor'} is the seller</p>
           </div>
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => dispatch(exportOrders({ type: 'sell', filters }))}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
             >
-              <Download className="w-4 h-4 mr-2" />
-              Export
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              Refresh
             </button>
           </div>
         </div>
@@ -193,7 +250,7 @@ const SellOrdersTab = ({ vendor }) => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-gray-600">Total Orders</p>
-              <p className="text-xl font-bold text-gray-900">{sellOrders.total}</p>
+              <p className="text-xl font-bold text-gray-900">{vendorSellOrders.total || 0}</p>
             </div>
           </div>
         </div>
@@ -204,9 +261,9 @@ const SellOrdersTab = ({ vendor }) => {
               <CheckCircle className="w-6 h-6 text-green-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-gray-600">Completed</p>
+              <p className="text-sm text-gray-600">Delivered</p>
               <p className="text-xl font-bold text-gray-900">
-                {sellOrders.data.filter(o => o.status === 'delivered').length}
+                {summaryStats.deliveredCount}
               </p>
             </div>
           </div>
@@ -220,7 +277,7 @@ const SellOrdersTab = ({ vendor }) => {
             <div className="ml-3">
               <p className="text-sm text-gray-600">Pending</p>
               <p className="text-xl font-bold text-gray-900">
-                {sellOrders.data.filter(o => o.status === 'pending').length}
+                {summaryStats.pendingCount}
               </p>
             </div>
           </div>
@@ -234,7 +291,7 @@ const SellOrdersTab = ({ vendor }) => {
             <div className="ml-3">
               <p className="text-sm text-gray-600">Revenue</p>
               <p className="text-xl font-bold text-gray-900">
-                {formatCurrency(sellOrders.data.reduce((sum, order) => sum + (order.total || 0), 0))}
+                {formatCurrency(summaryStats.totalRevenue)}
               </p>
             </div>
           </div>
@@ -243,20 +300,29 @@ const SellOrdersTab = ({ vendor }) => {
 
       {/* Orders Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        {sellOrders.loading ? (
+        {vendorSellOrders.loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
             <span className="ml-4 text-gray-600">Loading orders...</span>
           </div>
-        ) : sellOrders.error ? (
+        ) : vendorSellOrders.error ? (
           <div className="p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-            <p className="mt-2 text-sm text-red-600">{sellOrders.error}</p>
+            <p className="mt-2 text-sm text-red-600">{vendorSellOrders.error}</p>
+            <button
+              onClick={loadVendorSellOrders}
+              className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+            >
+              Retry
+            </button>
           </div>
-        ) : sellOrders.data.length === 0 ? (
+        ) : !vendorSellOrders.data || vendorSellOrders.data.length === 0 ? (
           <div className="p-6 text-center">
             <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <p className="mt-2 text-sm text-gray-600">No orders found</p>
+            <p className="mt-2 text-sm text-gray-600">No sell orders found</p>
+            <p className="text-sm text-gray-500">
+              This vendor hasn't sold any products yet
+            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -281,44 +347,63 @@ const SellOrdersTab = ({ vendor }) => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {sellOrders.data.map((order) => (
+                {vendorSellOrders.data.map((order) => (
                   <tr key={order._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {order.orderNumber}
+                        {order.orderNumber || 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500">
                         <div className="flex items-center">
                           <Calendar className="w-4 h-4 mr-1" />
-                          {format(new Date(order.createdAt), 'MMM d, yyyy')}
+                          {formatDate(order.createdAt)}
                         </div>
                         <div className="flex items-center mt-1">
                           <Clock className="w-4 h-4 mr-1" />
-                          {format(new Date(order.createdAt), 'h:mm a')}
+                          {order.createdAt ? format(new Date(order.createdAt), 'h:mm a') : 'N/A'}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {order.customerName}
+                        {order.customerName || 'N/A'}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {order.customerEmail}
+                        {order.customerEmail || 'N/A'}
                       </div>
+                      {order.customerPhone && (
+                        <div className="text-sm text-gray-500">
+                          {order.customerPhone}
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">
-                        {order.items?.length || 0} items
+                        {(order.items?.length || 0)} items
                       </div>
                       <div className="text-sm font-bold text-gray-900">
-                        {formatCurrency(order.total || 0)}
+                        {formatCurrency(order.total)}
                       </div>
+                      {order.paymentStatus && (
+                        <div className="text-xs mt-1">
+                          <span className={`px-2 py-1 rounded-full ${
+                            order.paymentStatus === 'paid' 
+                              ? 'bg-green-100 text-green-800'
+                              : order.paymentStatus === 'pending'
+                              ? 'bg-yellow-100 text-yellow-800'
+                              : 'bg-red-100 text-red-800'
+                          }`}>
+                            {order.paymentStatus}
+                          </span>
+                        </div>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={order.status} />
                       {order.trackingNumber && (
                         <div className="text-xs text-gray-500 mt-1">
                           Tracking: {order.trackingNumber}
+                          {order.carrier && ` (${order.carrier})`}
                         </div>
                       )}
                     </td>
@@ -326,14 +411,18 @@ const SellOrdersTab = ({ vendor }) => {
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => setSelectedOrder(order)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-blue-600 hover:text-blue-900 p-1"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => dispatch(generateInvoice(order._id))}
-                          className="text-green-600 hover:text-green-900"
+                          onClick={() => {
+                            if (order._id) {
+                              dispatch(generateInvoice(order._id));
+                            }
+                          }}
+                          className="text-green-600 hover:text-green-900 p-1"
                           title="Download Invoice"
                         >
                           <Download className="w-4 h-4" />
@@ -342,9 +431,9 @@ const SellOrdersTab = ({ vendor }) => {
                           onClick={() => setStatusModal({
                             show: true,
                             orderId: order._id,
-                            newStatus: order.status
+                            newStatus: order.status || 'pending'
                           })}
-                          className="text-purple-600 hover:text-purple-900"
+                          className="text-purple-600 hover:text-purple-900 p-1"
                           title="Update Status"
                         >
                           <MoreVertical className="w-4 h-4" />
@@ -359,19 +448,19 @@ const SellOrdersTab = ({ vendor }) => {
         )}
 
         {/* Pagination */}
-        {sellOrders.data.length > 0 && (
+        {vendorSellOrders.data && vendorSellOrders.data.length > 0 && (
           <div className="px-6 py-3 flex items-center justify-between border-t border-gray-200">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
-                onClick={() => handlePageChange(sellOrders.page - 1)}
-                disabled={sellOrders.page === 1}
+                onClick={() => handlePageChange((vendorSellOrders.page || 1) - 1)}
+                disabled={(vendorSellOrders.page || 1) === 1}
                 className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
                 Previous
               </button>
               <button
-                onClick={() => handlePageChange(sellOrders.page + 1)}
-                disabled={sellOrders.page === sellOrders.pages}
+                onClick={() => handlePageChange((vendorSellOrders.page || 1) + 1)}
+                disabled={(vendorSellOrders.page || 1) === (vendorSellOrders.pages || 1)}
                 className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
                 Next
@@ -380,32 +469,39 @@ const SellOrdersTab = ({ vendor }) => {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(sellOrders.page - 1) * 10 + 1}</span> to{' '}
+                  Showing <span className="font-medium">{((vendorSellOrders.page || 1) - 1) * 10 + 1}</span> to{' '}
                   <span className="font-medium">
-                    {Math.min(sellOrders.page * 10, sellOrders.total)}
+                    {Math.min((vendorSellOrders.page || 1) * 10, vendorSellOrders.total || 0)}
                   </span>{' '}
-                  of <span className="font-medium">{sellOrders.total}</span> results
+                  of <span className="font-medium">{vendorSellOrders.total || 0}</span> results
                 </p>
               </div>
               <div>
                 <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
                   <button
-                    onClick={() => handlePageChange(sellOrders.page - 1)}
-                    disabled={sellOrders.page === 1}
+                    onClick={() => handlePageChange((vendorSellOrders.page || 1) - 1)}
+                    disabled={(vendorSellOrders.page || 1) === 1}
                     className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
                     <span className="sr-only">Previous</span>
                     <ChevronLeft className="h-5 w-5" />
                   </button>
-                  {[...Array(Math.min(5, sellOrders.pages))].map((_, i) => {
-                    const pageNumber = Math.max(1, Math.min(sellOrders.pages - 4, sellOrders.page - 2)) + i;
-                    if (pageNumber > 0 && pageNumber <= sellOrders.pages) {
+                  {[...Array(Math.min(5, vendorSellOrders.pages || 1))].map((_, i) => {
+                    const pageNumber = Math.max(
+                      1, 
+                      Math.min(
+                        (vendorSellOrders.pages || 1) - 4, 
+                        (vendorSellOrders.page || 1) - 2
+                      )
+                    ) + i;
+                    
+                    if (pageNumber > 0 && pageNumber <= (vendorSellOrders.pages || 1)) {
                       return (
                         <button
                           key={pageNumber}
                           onClick={() => handlePageChange(pageNumber)}
                           className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            sellOrders.page === pageNumber
+                            (vendorSellOrders.page || 1) === pageNumber
                               ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
                               : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
                           }`}
@@ -417,8 +513,8 @@ const SellOrdersTab = ({ vendor }) => {
                     return null;
                   })}
                   <button
-                    onClick={() => handlePageChange(sellOrders.page + 1)}
-                    disabled={sellOrders.page === sellOrders.pages}
+                    onClick={() => handlePageChange((vendorSellOrders.page || 1) + 1)}
+                    disabled={(vendorSellOrders.page || 1) === (vendorSellOrders.pages || 1)}
                     className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
                     <span className="sr-only">Next</span>
@@ -530,12 +626,12 @@ const SellOrdersTab = ({ vendor }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Order Number</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedOrder.orderNumber}</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedOrder.orderNumber || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Date</p>
                     <p className="text-sm font-medium text-gray-900">
-                      {format(new Date(selectedOrder.createdAt), 'MMM d, yyyy h:mm a')}
+                      {formatDateTime(selectedOrder.createdAt)}
                     </p>
                   </div>
                   <div>
@@ -551,7 +647,7 @@ const SellOrdersTab = ({ vendor }) => {
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {selectedOrder.paymentStatus}
+                      {selectedOrder.paymentStatus || 'pending'}
                     </span>
                   </div>
                 </div>
@@ -561,23 +657,36 @@ const SellOrdersTab = ({ vendor }) => {
               <div className="mb-6">
                 <h4 className="text-sm font-medium text-gray-900 mb-2">Customer Information</h4>
                 <div className="bg-gray-50 rounded-lg p-4">
-                  <p className="text-sm font-medium text-gray-900">{selectedOrder.customerName}</p>
-                  <p className="text-sm text-gray-600">{selectedOrder.customerEmail}</p>
+                  <div className="flex items-center mb-2">
+                    <User className="w-4 h-4 text-gray-500 mr-2" />
+                    <p className="text-sm font-medium text-gray-900">{selectedOrder.customerName || 'N/A'}</p>
+                  </div>
+                  <p className="text-sm text-gray-600">{selectedOrder.customerEmail || 'N/A'}</p>
+                  {selectedOrder.customerPhone && (
+                    <p className="text-sm text-gray-600 mt-1">Phone: {selectedOrder.customerPhone}</p>
+                  )}
                 </div>
               </div>
 
               {/* Items */}
               <div className="mb-6">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Items ({selectedOrder.items?.length || 0})</h4>
+                <h4 className="text-sm font-medium text-gray-900 mb-2">
+                  Items ({selectedOrder.items?.length || 0})
+                </h4>
                 <div className="space-y-2">
                   {selectedOrder.items?.map((item, index) => (
                     <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">{item.productName}</p>
-                        <p className="text-sm text-gray-600">Qty: {item.quantity} × {formatCurrency(item.unitPrice)}</p>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{item.productName || 'Product'}</p>
+                        <p className="text-sm text-gray-600">
+                          Qty: {item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}
+                        </p>
+                        {item.ndcNumber && (
+                          <p className="text-xs text-gray-500 mt-1">NDC: {item.ndcNumber}</p>
+                        )}
                       </div>
-                      <div className="text-sm font-bold text-gray-900">
-                        {formatCurrency(item.totalPrice)}
+                      <div className="text-sm font-bold text-gray-900 ml-4">
+                        {formatCurrency(item.totalPrice || 0)}
                       </div>
                     </div>
                   ))}
@@ -589,12 +698,28 @@ const SellOrdersTab = ({ vendor }) => {
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-600">Subtotal</span>
                   <span className="text-sm font-medium text-gray-900">
-                    {formatCurrency(selectedOrder.total)}
+                    {formatCurrency(selectedOrder.subtotal || selectedOrder.total || 0)}
                   </span>
                 </div>
+                {selectedOrder.shippingCost > 0 && (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">Shipping</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatCurrency(selectedOrder.shippingCost)}
+                    </span>
+                  </div>
+                )}
+                {selectedOrder.tax > 0 && (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm text-gray-600">Tax</span>
+                    <span className="text-sm font-medium text-gray-900">
+                      {formatCurrency(selectedOrder.tax)}
+                    </span>
+                  </div>
+                )}
                 <div className="text-sm font-bold text-gray-900 flex justify-between items-center mt-4 pt-4 border-t">
                   <span>Total</span>
-                  <span>{formatCurrency(selectedOrder.total)}</span>
+                  <span>{formatCurrency(selectedOrder.total || 0)}</span>
                 </div>
               </div>
 
@@ -609,13 +734,13 @@ const SellOrdersTab = ({ vendor }) => {
                     </div>
                     <div>
                       <p className="text-sm text-gray-600">Carrier</p>
-                      <p className="text-sm font-medium text-gray-900">{selectedOrder.carrier}</p>
+                      <p className="text-sm font-medium text-gray-900">{selectedOrder.carrier || 'N/A'}</p>
                     </div>
                     {selectedOrder.shippedAt && (
                       <div>
                         <p className="text-sm text-gray-600">Shipped Date</p>
                         <p className="text-sm font-medium text-gray-900">
-                          {format(new Date(selectedOrder.shippedAt), 'MMM d, yyyy')}
+                          {formatDate(selectedOrder.shippedAt)}
                         </p>
                       </div>
                     )}
@@ -623,7 +748,7 @@ const SellOrdersTab = ({ vendor }) => {
                       <div>
                         <p className="text-sm text-gray-600">Delivered Date</p>
                         <p className="text-sm font-medium text-gray-900">
-                          {format(new Date(selectedOrder.deliveredAt), 'MMM d, yyyy')}
+                          {formatDate(selectedOrder.deliveredAt)}
                         </p>
                       </div>
                     )}
@@ -633,14 +758,29 @@ const SellOrdersTab = ({ vendor }) => {
             </div>
             <div className="px-6 py-4 border-t flex justify-end space-x-3">
               <button
-                onClick={() => dispatch(generateInvoice(selectedOrder._id))}
-                className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                onClick={() => {
+                  if (selectedOrder._id) {
+                    dispatch(generateInvoice(selectedOrder._id));
+                  }
+                }}
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
               >
+                <FileText className="w-4 h-4 mr-2" />
                 Download Invoice
               </button>
               <button
+                onClick={() => setStatusModal({
+                  show: true,
+                  orderId: selectedOrder._id,
+                  newStatus: selectedOrder.status
+                })}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                Update Status
+              </button>
+              <button
                 onClick={() => setSelectedOrder(null)}
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
               >
                 Close
               </button>

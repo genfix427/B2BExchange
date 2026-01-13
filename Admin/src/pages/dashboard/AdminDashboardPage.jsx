@@ -25,7 +25,8 @@ import {
   Percent,
   Target,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  RefreshCw
 } from 'lucide-react';
 import {
   BarChart as ReBarChart,
@@ -51,7 +52,7 @@ import {
   fetchRecentOrders,
   fetchOrderAnalytics,
   fetchTopVendors,
-  exportOrders
+  clearOrderData,
 } from '../../store/slices/orderSlice';
 
 const AdminDashboardPage = () => {
@@ -61,42 +62,53 @@ const AdminDashboardPage = () => {
     dashboardStats, 
     recentOrders, 
     analytics, 
-    topVendors,
-    exportLoading 
+    topVendors 
   } = useSelector((state) => state.orders);
 
   const [activeTab, setActiveTab] = useState('overview');
-  const [dateRange, setDateRange] = useState({
-    start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
-    end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
-  });
   const [period, setPeriod] = useState('month');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
-    // Fetch product stats
-    dispatch(fetchAdminProductStats());
-    dispatch(fetchAllProducts({
-      page: 1,
-      limit: 10,
-      sort: 'createdAt',
-      order: 'desc'
-    }));
-
-    // Fetch order stats
-    dispatch(fetchDashboardStats());
-    dispatch(fetchRecentOrders(10));
-    dispatch(fetchOrderAnalytics({ groupBy: 'day', dateFrom: format(subDays(new Date(), 30), 'yyyy-MM-dd') }));
-    dispatch(fetchTopVendors(5));
+    // Load initial data
+    loadDashboardData();
+    
+    // Clean up on unmount
+    return () => {
+      dispatch(clearOrderData());
+    };
   }, [dispatch]);
+
+  const loadDashboardData = async () => {
+    setIsRefreshing(true);
+    
+    try {
+      await Promise.all([
+        dispatch(fetchAdminProductStats()),
+        dispatch(fetchAllProducts({
+          page: 1,
+          limit: 10,
+          sort: 'createdAt',
+          order: 'desc'
+        })),
+        dispatch(fetchDashboardStats()),
+        dispatch(fetchRecentOrders(10)),
+        dispatch(fetchOrderAnalytics({ 
+          groupBy: 'month',
+          dateFrom: format(subDays(new Date(), 180), 'yyyy-MM-dd') 
+        })),
+        dispatch(fetchTopVendors(5))
+      ]);
+    } catch (error) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const handleRefreshStats = () => {
     dispatch(refreshAdminStats());
-    dispatch(fetchDashboardStats());
-    dispatch(fetchRecentOrders(10));
-  };
-
-  const handleExportOrders = () => {
-    dispatch(exportOrders({ type: 'all', filters: {} }));
+    loadDashboardData();
   };
 
   const getStatusColor = (status) => {
@@ -109,7 +121,9 @@ const AdminDashboardPage = () => {
       processing: 'bg-purple-100 text-purple-800',
       shipped: 'bg-orange-100 text-orange-800',
       delivered: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800'
+      cancelled: 'bg-red-100 text-red-800',
+      'partially_shipped': 'bg-orange-100 text-orange-800',
+      'partially_delivered': 'bg-green-100 text-green-800'
     };
     return colors[status] || colors.inactive;
   };
@@ -139,14 +153,26 @@ const AdminDashboardPage = () => {
     return new Intl.NumberFormat('en-US').format(num);
   };
 
-  // Get recent products (last 5 from the fetched products)
+  // Get recent products
   const recentProducts = products.slice(0, 5);
 
-  // Calculate order statistics
+  // Calculate order statistics from dashboard stats
   const calculateOrderStats = () => {
-    if (!dashboardStats.data) return null;
+    if (!dashboardStats.data) {
+      return {
+        totalOrders: 0,
+        totalRevenue: 0,
+        avgOrderValue: 0,
+        monthlyOrders: 0,
+        monthlyRevenue: 0,
+        dailyOrders: 0,
+        dailyRevenue: 0,
+        totalVendors: 0,
+        activeVendors: 0
+      };
+    }
     
-    const { summary, analytics } = dashboardStats.data;
+    const { summary } = dashboardStats.data;
     const lifetime = summary?.lifetime || {};
     const monthly = summary?.monthly || {};
     const daily = summary?.daily || {};
@@ -159,7 +185,8 @@ const AdminDashboardPage = () => {
       monthlyRevenue: monthly.revenue || 0,
       dailyOrders: daily.orders || 0,
       dailyRevenue: daily.revenue || 0,
-      totalVendors: summary?.totalVendors || 0
+      totalVendors: summary?.totalVendors || 0,
+      activeVendors: summary?.activeVendors || 0
     };
   };
 
@@ -167,26 +194,41 @@ const AdminDashboardPage = () => {
 
   // Prepare data for charts
   const prepareChartData = () => {
-    if (!analytics.data) return { monthlyTrend: [], statusDistribution: [], topVendorsData: [] };
+    if (!dashboardStats.data || !analytics.data) {
+      return { 
+        monthlyTrend: [], 
+        statusDistribution: [], 
+        topVendorsData: [],
+        analyticsData: []
+      };
+    }
     
-    const monthlyTrend = analytics.data.analytics?.monthlyTrend?.map(item => ({
+    const monthlyTrend = dashboardStats.data.analytics?.monthlyTrend?.map(item => ({
       month: item.month,
-      revenue: item.revenue,
-      orders: item.orders
+      revenue: item.revenue || 0,
+      orders: item.orders || 0
     })) || [];
     
-    const statusDistribution = dashboardStats.data?.analytics?.statusDistribution?.map(item => ({
-      name: item.status,
-      value: item.count
+    const statusDistribution = dashboardStats.data.analytics?.statusDistribution?.map(item => ({
+      name: item.status?.replace('_', ' ') || 'Unknown',
+      value: item.count || 0
     })) || [];
     
-    const topVendorsData = dashboardStats.data?.rankings?.topSellingVendors?.slice(0, 5).map(vendor => ({
-      name: vendor.vendorName?.length > 15 ? vendor.vendorName.substring(0, 15) + '...' : vendor.vendorName,
-      sales: vendor.totalSales,
-      orders: vendor.orderCount
+    const topVendorsData = dashboardStats.data.rankings?.topSellingVendors?.slice(0, 5).map(vendor => ({
+      name: vendor.vendorName?.length > 15 
+        ? vendor.vendorName.substring(0, 15) + '...' 
+        : vendor.vendorName || 'Unknown Vendor',
+      sales: vendor.totalSales || 0,
+      orders: vendor.orderCount || 0
     })) || [];
     
-    return { monthlyTrend, statusDistribution, topVendorsData };
+    const analyticsData = analytics.data?.analytics?.map(item => ({
+      date: item.date,
+      revenue: item.revenue || 0,
+      orders: item.orders || 0
+    })) || [];
+    
+    return { monthlyTrend, statusDistribution, topVendorsData, analyticsData };
   };
 
   const chartData = prepareChartData();
@@ -200,25 +242,14 @@ const AdminDashboardPage = () => {
       processing: Package,
       shipped: Truck,
       delivered: CheckSquare,
-      cancelled: AlertCircle
+      cancelled: AlertCircle,
+      partially_shipped: Truck,
+      partially_delivered: CheckSquare
     };
     return icons[status] || Clock;
   };
 
-  // Calculate growth percentage
-  const calculateGrowth = (current, previous) => {
-    if (!previous || previous === 0) return 100;
-    return ((current - previous) / previous * 100).toFixed(1);
-  };
-
-  if (productsLoading && !productStats.totalProducts) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <span className="ml-4 text-gray-600">Loading dashboard...</span>
-      </div>
-    );
-  }
+  const isLoading = productsLoading || dashboardStats.loading || isRefreshing;
 
   return (
     <div className="space-y-6">
@@ -235,17 +266,17 @@ const AdminDashboardPage = () => {
             </div>
             <button
               onClick={handleRefreshStats}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              disabled={isRefreshing}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
             >
-              Refresh
+              <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+              {isRefreshing ? 'Refreshing...' : 'Refresh'}
             </button>
             <button
-              onClick={handleExportOrders}
-              disabled={exportLoading}
-              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
             >
               <Download className="w-4 h-4 mr-2" />
-              Export Data
+              Export
             </button>
           </div>
         </div>
@@ -299,8 +330,16 @@ const AdminDashboardPage = () => {
         </div>
       </div>
 
+      {/* Loading State */}
+      {isLoading && !dashboardStats.data && (
+        <div className="flex justify-center items-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <span className="ml-4 text-gray-600">Loading dashboard data...</span>
+        </div>
+      )}
+
       {/* Overview Tab */}
-      {activeTab === 'overview' && (
+      {!isLoading && activeTab === 'overview' && (
         <div className="space-y-6">
           {/* Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -310,16 +349,16 @@ const AdminDashboardPage = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Orders</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatNumber(orderStats?.totalOrders || 0)}
+                    {formatNumber(orderStats.totalOrders)}
                   </p>
                   <div className="mt-2 flex items-center text-sm">
-                    <span className={`inline-flex items-center ${orderStats?.monthlyOrders > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {orderStats?.monthlyOrders > 0 ? (
+                    <span className={`inline-flex items-center ${orderStats.monthlyOrders > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {orderStats.monthlyOrders > 0 ? (
                         <ArrowUpRight className="w-4 h-4 mr-1" />
                       ) : (
                         <ArrowDownRight className="w-4 h-4 mr-1" />
                       )}
-                      {orderStats?.monthlyOrders || 0} this month
+                      {orderStats.monthlyOrders} this month
                     </span>
                   </div>
                 </div>
@@ -335,16 +374,16 @@ const AdminDashboardPage = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Total Revenue</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatPrice(orderStats?.totalRevenue || 0)}
+                    {formatPrice(orderStats.totalRevenue)}
                   </p>
                   <div className="mt-2 flex items-center text-sm">
-                    <span className={`inline-flex items-center ${orderStats?.monthlyRevenue > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {orderStats?.monthlyRevenue > 0 ? (
+                    <span className={`inline-flex items-center ${orderStats.monthlyRevenue > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {orderStats.monthlyRevenue > 0 ? (
                         <ArrowUpRight className="w-4 h-4 mr-1" />
                       ) : (
                         <ArrowDownRight className="w-4 h-4 mr-1" />
                       )}
-                      {formatPrice(orderStats?.monthlyRevenue || 0)} this month
+                      {formatPrice(orderStats.monthlyRevenue)} this month
                     </span>
                   </div>
                 </div>
@@ -356,47 +395,42 @@ const AdminDashboardPage = () => {
 
             {/* Total Products */}
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-purple-100 rounded-lg">
-                  <Package className="w-6 h-6 text-purple-600" />
-                </div>
-                <div className="ml-3">
+              <div className="flex items-center justify-between">
+                <div>
                   <p className="text-sm font-medium text-gray-600">Total Products</p>
                   <p className="text-2xl font-bold text-gray-900">{productStats.totalProducts || 0}</p>
+                  <div className="mt-2 text-sm text-gray-500">
+                    <span className="text-green-600">{productStats.activeProducts || 0} active</span>
+                    <span className="mx-2">•</span>
+                    <span className="text-red-600">{productStats.outOfStockProducts || 0} out of stock</span>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4 flex items-center justify-between text-sm text-gray-500">
-                <div className="flex items-center">
-                  <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  <span>Active: {productStats.activeProducts || 0}</span>
-                </div>
-                <div className="text-red-500">
-                  Out of stock: {productStats.outOfStockProducts || 0}
+                <div className="p-3 bg-purple-100 rounded-lg">
+                  <Package className="w-8 h-8 text-purple-600" />
                 </div>
               </div>
             </div>
 
             {/* Total Vendors */}
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center">
-                <div className="p-2 bg-orange-100 rounded-lg">
-                  <Users className="w-6 h-6 text-orange-600" />
-                </div>
-                <div className="ml-3">
+              <div className="flex items-center justify-between">
+                <div>
                   <p className="text-sm font-medium text-gray-600">Total Vendors</p>
-                  <p className="text-2xl font-bold text-gray-900">{orderStats?.totalVendors || 0}</p>
+                  <p className="text-2xl font-bold text-gray-900">{orderStats.totalVendors}</p>
+                  <div className="mt-2 text-sm text-gray-500">
+                    <span>{orderStats.activeVendors} active</span>
+                  </div>
                 </div>
-              </div>
-              <div className="mt-4 text-sm text-gray-500">
-                <Building2 className="w-4 h-4 inline text-blue-500 mr-1" />
-                <span>Active suppliers</span>
+                <div className="p-3 bg-orange-100 rounded-lg">
+                  <Users className="w-8 h-8 text-orange-600" />
+                </div>
               </div>
             </div>
           </div>
 
           {/* Charts Section */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Monthly Revenue Trend */}
+            {/* Revenue Trend */}
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Revenue Trend</h3>
@@ -412,32 +446,41 @@ const AdminDashboardPage = () => {
                 </select>
               </div>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={chartData.monthlyTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value) => [formatPrice(value), 'Revenue']}
-                      labelFormatter={(label) => `Month: ${label}`}
-                    />
-                    <Legend />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#8884d8" 
-                      strokeWidth={2}
-                      name="Revenue"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="orders" 
-                      stroke="#82ca9d" 
-                      strokeWidth={2}
-                      name="Orders"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                {chartData.monthlyTrend.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={chartData.monthlyTrend}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value) => [formatPrice(value), 'Revenue']}
+                        labelFormatter={(label) => `Month: ${label}`}
+                      />
+                      <Legend />
+                      <Line 
+                        type="monotone" 
+                        dataKey="revenue" 
+                        stroke="#8884d8" 
+                        strokeWidth={2}
+                        name="Revenue"
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="orders" 
+                        stroke="#82ca9d" 
+                        strokeWidth={2}
+                        name="Orders"
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <BarChart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No revenue data available</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -445,25 +488,34 @@ const AdminDashboardPage = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status Distribution</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={chartData.statusDistribution}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
-                    >
-                      {chartData.statusDistribution.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value) => [value, 'Orders']} />
-                  </PieChart>
-                </ResponsiveContainer>
+                {chartData.statusDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={chartData.statusDistribution}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        {chartData.statusDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Tooltip formatter={(value) => [value, 'Orders']} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <PieChart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No order status data available</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -535,7 +587,7 @@ const AdminDashboardPage = () => {
                           <tr key={order._id} className="hover:bg-gray-50">
                             <td className="px-6 py-4">
                               <div className="text-sm font-medium text-gray-900">
-                                {order.orderNumber}
+                                {order.orderNumber || 'N/A'}
                               </div>
                               <div className="text-sm text-gray-500">
                                 {formatDateTime(order.createdAt)}
@@ -543,10 +595,10 @@ const AdminDashboardPage = () => {
                             </td>
                             <td className="px-6 py-4">
                               <div className="text-sm text-gray-900">
-                                {order.customerName}
+                                {order.customerName || 'N/A'}
                               </div>
                               <div className="text-sm text-gray-500">
-                                {order.customerEmail}
+                                {order.customerEmail || 'N/A'}
                               </div>
                             </td>
                             <td className="px-6 py-4">
@@ -557,7 +609,7 @@ const AdminDashboardPage = () => {
                             <td className="px-6 py-4">
                               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                                 <StatusIcon className="w-3 h-3 mr-1" />
-                                {order.status?.replace('_', ' ')}
+                                {order.status?.replace('_', ' ') || 'Unknown'}
                               </span>
                             </td>
                           </tr>
@@ -645,10 +697,10 @@ const AdminDashboardPage = () => {
                               )}
                               <div className="ml-4">
                                 <div className="text-sm font-medium text-gray-900">
-                                  {product.productName}
+                                  {product.productName || 'N/A'}
                                 </div>
                                 <div className="text-sm text-gray-500">
-                                  {product.ndcNumber}
+                                  {product.ndcNumber || 'N/A'}
                                 </div>
                               </div>
                             </div>
@@ -695,7 +747,7 @@ const AdminDashboardPage = () => {
       )}
 
       {/* Orders Tab */}
-      {activeTab === 'orders' && (
+      {!isLoading && activeTab === 'orders' && (
         <div className="space-y-6">
           {/* Order Stats Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -704,10 +756,10 @@ const AdminDashboardPage = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Today's Orders</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {orderStats?.dailyOrders || 0}
+                    {orderStats.dailyOrders}
                   </p>
                   <p className="text-sm text-gray-500 mt-1">
-                    {formatPrice(orderStats?.dailyRevenue || 0)}
+                    {formatPrice(orderStats.dailyRevenue)}
                   </p>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-lg">
@@ -721,10 +773,10 @@ const AdminDashboardPage = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Avg Order Value</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatPrice(orderStats?.avgOrderValue || 0)}
+                    {formatPrice(orderStats.avgOrderValue)}
                   </p>
                   <p className="text-sm text-green-600 mt-1">
-                    +12% from last month
+                    {orderStats.avgOrderValue > 0 ? '+12% from last month' : 'No data'}
                   </p>
                 </div>
                 <div className="p-3 bg-green-100 rounded-lg">
@@ -773,69 +825,62 @@ const AdminDashboardPage = () => {
 
           {/* Order Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Order Value Trend */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Value Trend</h3>
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={chartData.monthlyTrend}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value) => [formatPrice(value), 'Revenue']}
-                    />
-                    <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
             {/* Top Vendors by Sales */}
             <div className="bg-white rounded-lg shadow p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Top Vendors by Sales</h3>
               <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <ReBarChart data={chartData.topVendorsData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip 
-                      formatter={(value, name) => {
-                        if (name === 'sales') return [formatPrice(value), 'Sales'];
-                        return [value, 'Orders'];
-                      }}
-                    />
-                    <Bar dataKey="sales" fill="#8884d8" name="Sales" />
-                  </ReBarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-
-          {/* Detailed Order Status */}
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-semibold text-gray-900">Order Status Breakdown</h3>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {dashboardStats.data?.analytics?.statusBreakdown?.map((status) => (
-                  <div key={status._id} className="border rounded-lg p-4">
-                    <div className="flex items-center">
-                      {status._id === 'delivered' && <CheckSquare className="w-5 h-5 text-green-600 mr-2" />}
-                      {status._id === 'shipped' && <Truck className="w-5 h-5 text-orange-600 mr-2" />}
-                      {status._id === 'processing' && <Package className="w-5 h-5 text-blue-600 mr-2" />}
-                      {status._id === 'pending' && <Clock className="w-5 h-5 text-yellow-600 mr-2" />}
-                      {status._id === 'cancelled' && <AlertCircle className="w-5 h-5 text-red-600 mr-2" />}
-                      <div>
-                        <p className="text-sm font-medium text-gray-600 capitalize">{status._id}</p>
-                        <p className="text-2xl font-bold text-gray-900">{status.count}</p>
-                        <p className="text-sm text-gray-500">{formatPrice(status.revenue || 0)}</p>
-                      </div>
+                {chartData.topVendorsData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ReBarChart data={chartData.topVendorsData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === 'sales') return [formatPrice(value), 'Sales'];
+                          return [value, 'Orders'];
+                        }}
+                      />
+                      <Bar dataKey="sales" fill="#8884d8" name="Sales" />
+                    </ReBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <BarChart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No vendor sales data available</p>
                     </div>
                   </div>
-                ))}
+                )}
+              </div>
+            </div>
+
+            {/* Order Status Distribution */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status Breakdown</h3>
+              <div className="h-64">
+                {chartData.statusDistribution.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ReBarChart data={chartData.statusDistribution}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip formatter={(value) => [value, 'Orders']} />
+                      <Bar dataKey="value" fill="#82ca9d" name="Orders">
+                        {chartData.statusDistribution.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                      </Bar>
+                    </ReBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <BarChart className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No order status data available</p>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -843,7 +888,7 @@ const AdminDashboardPage = () => {
       )}
 
       {/* Analytics Tab */}
-      {activeTab === 'analytics' && (
+      {!isLoading && activeTab === 'analytics' && (
         <div className="space-y-6">
           {/* Analytics Cards */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -890,10 +935,10 @@ const AdminDashboardPage = () => {
                 <div>
                   <p className="text-sm font-medium text-gray-600">Revenue per Order</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatPrice(orderStats.avgOrderValue || 0)}
+                    {formatPrice(orderStats.avgOrderValue)}
                   </p>
                   <p className="text-sm text-purple-600 mt-1">
-                    +8% from last quarter
+                    {orderStats.avgOrderValue > 0 ? '+8% from last quarter' : 'No data'}
                   </p>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-lg">
@@ -903,48 +948,49 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
-          {/* Performance Charts */}
+          {/* Analytics Chart */}
           <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-6">Performance Metrics</h3>
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-900">Revenue Analytics</h3>
+              <select
+                value={period}
+                onChange={(e) => setPeriod(e.target.value)}
+                className="block pl-3 pr-10 py-2 text-sm border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 rounded-md"
+              >
+                <option value="day">Daily</option>
+                <option value="week">Weekly</option>
+                <option value="month">Monthly</option>
+                <option value="quarter">Quarterly</option>
+              </select>
+            </div>
             <div className="h-80">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData.monthlyTrend}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="month" />
-                  <YAxis yAxisId="left" />
-                  <YAxis yAxisId="right" orientation="right" />
-                  <Tooltip 
-                    formatter={(value, name) => {
-                      if (name === 'revenue') return [formatPrice(value), 'Revenue'];
-                      return [value, 'Orders'];
-                    }}
-                  />
-                  <Legend />
-                  <Line 
-                    yAxisId="left"
-                    type="monotone" 
-                    dataKey="orders" 
-                    stroke="#8884d8" 
-                    strokeWidth={2}
-                    name="Orders"
-                  />
-                  <Line 
-                    yAxisId="right"
-                    type="monotone" 
-                    dataKey="revenue" 
-                    stroke="#82ca9d" 
-                    strokeWidth={2}
-                    name="Revenue"
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {chartData.analyticsData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={chartData.analyticsData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value) => [formatPrice(value), 'Revenue']}
+                    />
+                    <Area type="monotone" dataKey="revenue" stroke="#8884d8" fill="#8884d8" fillOpacity={0.3} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Activity className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">No analytics data available</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* Products Tab */}
-      {activeTab === 'products' && (
+      {!isLoading && activeTab === 'products' && (
         <div className="space-y-6">
           {/* Product Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1017,33 +1063,44 @@ const AdminDashboardPage = () => {
             </div>
           </div>
 
-          {/* Product Distribution */}
+          {/* Product Distribution Chart */}
           <div className="bg-white shadow rounded-lg p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Status Distribution</h3>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <ReBarChart data={[
-                  { name: 'Active', value: productStats.activeProducts || 0, color: '#10B981' },
-                  { name: 'Inactive', value: productStats.inactiveProducts || 0, color: '#6B7280' },
-                  { name: 'Out of Stock', value: productStats.outOfStockProducts || 0, color: '#EF4444' },
-                  { name: 'Low Stock', value: productStats.lowStockProducts || 0, color: '#F59E0B' }
-                ]}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip formatter={(value) => [value, 'Products']} />
-                  <Bar dataKey="value" fill="#8884d8">
-                    {[
-                      { name: 'Active', value: productStats.activeProducts || 0, color: '#10B981' },
-                      { name: 'Inactive', value: productStats.inactiveProducts || 0, color: '#6B7280' },
-                      { name: 'Out of Stock', value: productStats.outOfStockProducts || 0, color: '#EF4444' },
-                      { name: 'Low Stock', value: productStats.lowStockProducts || 0, color: '#F59E0B' }
-                    ].map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Bar>
-                </ReBarChart>
-              </ResponsiveContainer>
+              {productStats.totalProducts > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: 'Active', value: productStats.activeProducts || 0 },
+                        { name: 'Inactive', value: productStats.inactiveProducts || 0 },
+                        { name: 'Out of Stock', value: productStats.outOfStockProducts || 0 },
+                        { name: 'Low Stock', value: productStats.lowStockProducts || 0 }
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      labelLine={false}
+                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                      outerRadius={80}
+                      fill="#8884d8"
+                      dataKey="value"
+                    >
+                      <Cell fill="#10B981" />
+                      <Cell fill="#6B7280" />
+                      <Cell fill="#EF4444" />
+                      <Cell fill="#F59E0B" />
+                    </Pie>
+                    <Tooltip formatter={(value) => [value, 'Products']} />
+                  </PieChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">No product data available</p>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1089,39 +1146,41 @@ const AdminDashboardPage = () => {
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Insights</h3>
           <div className="grid grid-cols-2 gap-4">
             <div className="border-l-4 border-blue-500 pl-4">
-              {/* <p className="text-sm text-gray-600">Monthly Growth</p>
+              <p className="text-sm text-gray-600">Monthly Growth</p>
               <p className="text-2xl font-bold text-gray-900">
                 {orderStats.monthlyOrders > 0 ? 
                   Math.round((orderStats.monthlyOrders / 30) * 100) / 100 + '/day' : 
                   '0/day'
                 }
-              </p> */}
+              </p>
               <p className="text-xs text-gray-500">Average daily orders this month</p>
             </div>
             <div className="border-l-4 border-green-500 pl-4">
-              {/* <p className="text-sm text-gray-600">Vendor Engagement</p>
+              <p className="text-sm text-gray-600">Vendor Engagement</p>
               <p className="text-2xl font-bold text-gray-900">
                 {orderStats.totalVendors > 0 ? 
-                  Math.round((dashboardStats.data?.rankings?.topSellingVendors?.length || 0) / orderStats.totalVendors * 100) + '%' : 
+                  Math.round((orderStats.activeVendors / orderStats.totalVendors) * 100) + '%' : 
                   '0%'
                 }
-              </p> */}
+              </p>
               <p className="text-xs text-gray-500">Active selling vendors</p>
             </div>
             <div className="border-l-4 border-purple-500 pl-4">
-              {/* <p className="text-sm text-gray-600">Order Completion</p>
+              <p className="text-sm text-gray-600">Order Completion</p>
               <p className="text-2xl font-bold text-gray-900">
                 {orderStats.totalOrders > 0 ? 
                   Math.round((dashboardStats.data?.analytics?.statusBreakdown?.find(s => s._id === 'delivered')?.count || 0) / orderStats.totalOrders * 100) + '%' : 
                   '0%'
                 }
-              </p> */}
+              </p>
               <p className="text-xs text-gray-500">Successful deliveries</p>
             </div>
             <div className="border-l-4 border-orange-500 pl-4">
-              <p className="text-sm text-gray-600">Avg Response Time</p>
-              <p className="text-2xl font-bold text-gray-900">4.2h</p>
-              <p className="text-xs text-gray-500">Order processing time</p>
+              <p className="text-sm text-gray-600">Avg Order Value</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatPrice(orderStats.avgOrderValue)}
+              </p>
+              <p className="text-xs text-gray-500">Per transaction</p>
             </div>
           </div>
         </div>

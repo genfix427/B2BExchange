@@ -13,7 +13,10 @@ import {
   fetchVendorProducts
 } from '../../store/slices/adminProductSlice'
 import {
-  clearOrderData
+  clearOrderData,
+  fetchVendorSellOrders,
+  fetchVendorPurchaseOrders,
+  fetchVendorOrderStats
 } from '../../store/slices/orderSlice'
 import {
   AlertCircle,
@@ -55,7 +58,7 @@ import OrdersTab from '../../components/VendorDetails/OrdersTab'
 import AnalyticsTab from '../../components/VendorDetails/AnalyticsTab'
 import HistoryTab from '../../components/VendorDetails/HistoryTab'
 import BankDetailsTab from '../../components/VendorDetails/BankDetailsTab'
-import Index from '../../components/VendorDetails/OrdersTab/Index'
+import OrdersTabComponent from '../../components/VendorDetails/OrdersTab/Index'
 
 // Import modal components
 import RejectModal from '../../components/VendorDetails/modals/RejectModal'
@@ -82,9 +85,14 @@ const VendorDetailPage = () => {
   
   const { selectedVendor, isLoading, error } = useSelector((state) => state.vendors)
   const { vendorProducts } = useSelector((state) => state.adminProducts)
-  const { sellOrders, purchaseOrders, stats } = useSelector((state) => state.orders)
+  const { 
+    vendorSellOrders, 
+    vendorPurchaseOrders,
+    vendorStats 
+  } = useSelector((state) => state.orders)
 
   const [activeTab, setActiveTab] = useState('info')
+  const [isLoadingOrders, setIsLoadingOrders] = useState(false)
 
   // Custom hooks
   const { getStatusConfig } = useVendorStatus()
@@ -142,8 +150,34 @@ const VendorDetailPage = () => {
   useEffect(() => {
     if (selectedVendor?._id) {
       dispatch(fetchVendorProducts({ vendorId: selectedVendor._id }))
+      
+      // Load order data for this vendor
+      loadVendorOrderData()
     }
   }, [dispatch, selectedVendor?._id])
+
+  const loadVendorOrderData = async () => {
+    if (!selectedVendor?._id) return
+    
+    setIsLoadingOrders(true)
+    try {
+      await Promise.all([
+        dispatch(fetchVendorOrderStats({ vendorId: selectedVendor._id, period: 'month' })),
+        dispatch(fetchVendorSellOrders({ 
+          vendorId: selectedVendor._id, 
+          params: { page: 1, limit: 5 } 
+        })),
+        dispatch(fetchVendorPurchaseOrders({ 
+          vendorId: selectedVendor._id, 
+          params: { page: 1, limit: 5 } 
+        }))
+      ])
+    } catch (error) {
+      console.error('Error loading vendor order data:', error)
+    } finally {
+      setIsLoadingOrders(false)
+    }
+  }
 
   useEffect(() => {
     // Clean up order data when component unmounts
@@ -152,18 +186,23 @@ const VendorDetailPage = () => {
     }
   }, [dispatch])
 
-  // Calculate stats for quick view
+  // Calculate stats for quick view - SAFE version
   const calculateQuickStats = () => {
-    const sellRevenue = sellOrders.data?.reduce((sum, order) => sum + (order.total || 0), 0) || 0
-    const purchaseSpent = purchaseOrders.data?.reduce((sum, order) => sum + (order.total || 0), 0) || 0
+    // Use safe access with default values
+    const sellData = vendorSellOrders?.data || []
+    const purchaseData = vendorPurchaseOrders?.data || []
+    
+    const sellRevenue = sellData.reduce((sum, order) => sum + (order.total || 0), 0)
+    const purchaseSpent = purchaseData.reduce((sum, order) => sum + (order.total || 0), 0)
     
     return {
-      sellOrders: sellOrders.total || 0,
-      purchaseOrders: purchaseOrders.total || 0,
+      sellOrders: vendorSellOrders?.total || 0,
+      purchaseOrders: vendorPurchaseOrders?.total || 0,
       sellRevenue,
       purchaseSpent,
       totalRevenue: sellRevenue + purchaseSpent,
-      avgOrderValue: sellOrders.total > 0 ? sellRevenue / sellOrders.total : 0
+      avgOrderValue: (vendorSellOrders?.total || 0) > 0 ? 
+        sellRevenue / (vendorSellOrders?.total || 1) : 0
     }
   }
 
@@ -172,18 +211,45 @@ const VendorDetailPage = () => {
   const getProductsCount = () => vendorProducts?.length ?? 0
 
   const getOrderStats = () => {
-    const deliveredSell = sellOrders.data?.filter(o => o.status === 'delivered').length || 0
-    const deliveredPurchase = purchaseOrders.data?.filter(o => o.status === 'delivered').length || 0
+    const sellData = vendorSellOrders?.data || []
+    const purchaseData = vendorPurchaseOrders?.data || []
+    
+    const deliveredSell = sellData.filter(o => o.status === 'delivered').length
+    const deliveredPurchase = purchaseData.filter(o => o.status === 'delivered').length
     
     return {
       deliveredSell,
       deliveredPurchase,
-      pendingSell: sellOrders.data?.filter(o => o.status === 'pending').length || 0,
-      pendingPurchase: purchaseOrders.data?.filter(o => o.status === 'pending').length || 0
+      pendingSell: sellData.filter(o => o.status === 'pending').length,
+      pendingPurchase: purchaseData.filter(o => o.status === 'pending').length,
+      processingSell: sellData.filter(o => o.status === 'processing').length,
+      shippedSell: sellData.filter(o => o.status === 'shipped').length
     }
   }
 
   const orderStats = getOrderStats()
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
+
+  // Get vendor order stats from vendorStats
+  const getVendorAnalytics = () => {
+    if (!vendorStats?.data) {
+      return {
+        sell: { summary: { totalOrders: 0, totalRevenue: 0, totalItemsSold: 0 } },
+        purchase: { summary: { totalOrders: 0, totalSpent: 0 } }
+      }
+    }
+    return vendorStats.data
+  }
+
+  const vendorAnalytics = getVendorAnalytics()
 
   if (isLoading) {
     return (
@@ -231,15 +297,6 @@ const VendorDetailPage = () => {
   const statusConfig = getStatusConfig(selectedVendor.status)
   const StatusIcon = getStatusIcon(selectedVendor.status)
 
-  const formatCurrency = (amount) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    }).format(amount)
-  }
-
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -261,7 +318,6 @@ const VendorDetailPage = () => {
                 <span className="ml-1 capitalize">
                   {selectedVendor.status}
                 </span>
-                <span className="ml-1">{selectedVendor.status?.charAt(0).toUpperCase() + selectedVendor.status?.slice(1)}</span>
               </span>
               <span className="text-sm text-gray-500">
                 ID: {selectedVendor._id?.slice(-8) || 'N/A'}
@@ -367,9 +423,11 @@ const VendorDetailPage = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Sell Orders</p>
               <p className="text-xl font-bold text-gray-900">{quickStats.sellOrders}</p>
-              <p className="text-xs text-green-600">
-                {orderStats.deliveredSell} delivered
-              </p>
+              {!isLoadingOrders && quickStats.sellOrders > 0 && (
+                <p className="text-xs text-green-600">
+                  {orderStats.deliveredSell} delivered
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -381,9 +439,11 @@ const VendorDetailPage = () => {
             <div className="ml-3">
               <p className="text-sm font-medium text-gray-600">Purchase Orders</p>
               <p className="text-xl font-bold text-gray-900">{quickStats.purchaseOrders}</p>
-              <p className="text-xs text-green-600">
-                {orderStats.deliveredPurchase} delivered
-              </p>
+              {!isLoadingOrders && quickStats.purchaseOrders > 0 && (
+                <p className="text-xs text-green-600">
+                  {orderStats.deliveredPurchase} delivered
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -393,7 +453,7 @@ const VendorDetailPage = () => {
               <DollarSign className="w-6 h-6 text-teal-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              <p className="text-sm font-medium text-gray-600">Sell Revenue</p>
               <p className="text-xl font-bold text-gray-900">{formatCurrency(quickStats.sellRevenue)}</p>
               <p className="text-xs text-gray-600">
                 Avg: {formatCurrency(quickStats.avgOrderValue)}
@@ -413,7 +473,7 @@ const VendorDetailPage = () => {
                 {formatCurrency(quickStats.sellRevenue)}
               </p>
               <p className="text-xs text-gray-500">
-                {quickStats.sellOrders} orders • {sellOrders.data?.length || 0} active
+                {quickStats.sellOrders} orders • {vendorSellOrders?.data?.length || 0} recent
               </p>
             </div>
             <div className={`p-2 rounded-lg ${
@@ -551,7 +611,7 @@ const VendorDetailPage = () => {
         )}
 
         {activeTab === 'orders' && (
-          <Index vendor={selectedVendor} />
+          <OrdersTabComponent vendor={selectedVendor} />
         )}
 
         {activeTab === 'analytics' && (
@@ -566,75 +626,82 @@ const VendorDetailPage = () => {
       {/* Order Status Summary */}
       <div className="bg-white rounded-lg shadow p-4">
         <h3 className="text-sm font-semibold text-gray-900 mb-4">Order Status Overview</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Pending Orders</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {orderStats.pendingSell + orderStats.pendingPurchase}
-                </p>
+        {isLoadingOrders ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <span className="ml-3 text-gray-600">Loading order stats...</span>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Pending Orders</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {orderStats.pendingSell + orderStats.pendingPurchase}
+                  </p>
+                </div>
+                <div className="p-2 bg-yellow-100 rounded-lg">
+                  <Clock className="w-6 h-6 text-yellow-600" />
+                </div>
               </div>
-              <div className="p-2 bg-yellow-100 rounded-lg">
-                <Clock className="w-6 h-6 text-yellow-600" />
+              <div className="mt-2 text-xs text-gray-500">
+                {orderStats.pendingSell} sell • {orderStats.pendingPurchase} purchase
               </div>
             </div>
-            <div className="mt-2 text-xs text-gray-500">
-              {orderStats.pendingSell} sell • {orderStats.pendingPurchase} purchase
+            
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Processing</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {orderStats.processingSell}
+                  </p>
+                </div>
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <Package className="w-6 h-6 text-blue-600" />
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                In progress
+              </div>
+            </div>
+            
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Shipped</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {orderStats.shippedSell}
+                  </p>
+                </div>
+                <div className="p-2 bg-orange-100 rounded-lg">
+                  <Truck className="w-6 h-6 text-orange-600" />
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                In transit
+              </div>
+            </div>
+            
+            <div className="border rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Delivered</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {orderStats.deliveredSell + orderStats.deliveredPurchase}
+                  </p>
+                </div>
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckSquare className="w-6 h-6 text-green-600" />
+                </div>
+              </div>
+              <div className="mt-2 text-xs text-gray-500">
+                {orderStats.deliveredSell} sell • {orderStats.deliveredPurchase} purchase
+              </div>
             </div>
           </div>
-          
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Processing</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {sellOrders.data?.filter(o => o.status === 'processing').length || 0}
-                </p>
-              </div>
-              <div className="p-2 bg-blue-100 rounded-lg">
-                <Package className="w-6 h-6 text-blue-600" />
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-gray-500">
-              In progress
-            </div>
-          </div>
-          
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Shipped</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {sellOrders.data?.filter(o => o.status === 'shipped').length || 0}
-                </p>
-              </div>
-              <div className="p-2 bg-orange-100 rounded-lg">
-                <Truck className="w-6 h-6 text-orange-600" />
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-gray-500">
-              In transit
-            </div>
-          </div>
-          
-          <div className="border rounded-lg p-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Delivered</p>
-                <p className="text-xl font-bold text-gray-900">
-                  {orderStats.deliveredSell + orderStats.deliveredPurchase}
-                </p>
-              </div>
-              <div className="p-2 bg-green-100 rounded-lg">
-                <CheckSquare className="w-6 h-6 text-green-600" />
-              </div>
-            </div>
-            <div className="mt-2 text-xs text-gray-500">
-              {orderStats.deliveredSell} sell • {orderStats.deliveredPurchase} purchase
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Bank Account Status */}
@@ -674,48 +741,61 @@ const VendorDetailPage = () => {
             View All →
           </button>
         </div>
-        <div className="space-y-3">
-          {sellOrders.data?.slice(0, 3).map((order) => (
-            <div key={order._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Sell Order: {order.orderNumber}
-                </p>
-                <p className="text-xs text-gray-500">
-                  {order.customerName} • {formatCurrency(order.total)}
-                </p>
+        {isLoadingOrders ? (
+          <div className="flex justify-center items-center h-32">
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+            <span className="ml-2 text-sm text-gray-600">Loading recent activity...</span>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {vendorSellOrders?.data?.slice(0, 3).map((order) => (
+              <div key={order._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Sell Order: {order.orderNumber || 'N/A'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    {order.customerName || 'Customer'} • {formatCurrency(order.total || 0)}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                  order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
+                  order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {order.status || 'unknown'}
+                </span>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
-                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-blue-100 text-blue-800'
-              }`}>
-                {order.status}
-              </span>
-            </div>
-          ))}
-          {purchaseOrders.data?.slice(0, 2).map((order) => (
-            <div key={order._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
-              <div>
-                <p className="text-sm font-medium text-gray-900">
-                  Purchase: {order.orderNumber}
-                </p>
-                <p className="text-xs text-gray-500">
-                  From {order.items?.[0]?.vendorName || 'multiple vendors'} • {formatCurrency(order.total)}
-                </p>
+            ))}
+            {vendorPurchaseOrders?.data?.slice(0, 2).map((order) => (
+              <div key={order._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                <div>
+                  <p className="text-sm font-medium text-gray-900">
+                    Purchase: {order.orderNumber || 'N/A'}
+                  </p>
+                  <p className="text-xs text-gray-500">
+                    From {order.items?.[0]?.vendorName || 'multiple vendors'} • {formatCurrency(order.total || 0)}
+                  </p>
+                </div>
+                <span className={`text-xs px-2 py-1 rounded-full ${
+                  order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                  order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
+                  order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  'bg-blue-100 text-blue-800'
+                }`}>
+                  {order.status || 'unknown'}
+                </span>
               </div>
-              <span className={`text-xs px-2 py-1 rounded-full ${
-                order.status === 'delivered' ? 'bg-green-100 text-green-800' :
-                order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
-                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                'bg-blue-100 text-blue-800'
-              }`}>
-                {order.status}
-              </span>
-            </div>
-          ))}
-        </div>
+            ))}
+            {(vendorSellOrders?.data?.length === 0 && vendorPurchaseOrders?.data?.length === 0) && (
+              <div className="text-center py-4">
+                <ShoppingCart className="mx-auto h-8 w-8 text-gray-400 mb-2" />
+                <p className="text-sm text-gray-500">No recent orders found</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Modals */}

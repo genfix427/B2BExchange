@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import {
   fetchVendorPurchaseOrders,
   generateInvoice,
-  setPurchaseOrdersPage
+  setVendorPurchaseOrdersPage
 } from '../../../store/slices/orderSlice';
 import {
   Search,
@@ -27,7 +27,7 @@ import StatusBadge from './StatusBadge';
 
 const PurchaseOrdersTab = ({ vendor }) => {
   const dispatch = useDispatch();
-  const { purchaseOrders } = useSelector((state) => state.orders);
+  const { vendorPurchaseOrders } = useSelector((state) => state.orders);
   
   const [filters, setFilters] = useState({
     status: '',
@@ -52,39 +52,54 @@ const PurchaseOrdersTab = ({ vendor }) => {
       dispatch(fetchVendorPurchaseOrders({
         vendorId: vendor._id,
         params: {
-          page: purchaseOrders.page,
+          page: vendorPurchaseOrders.page,
           limit: 10,
           ...filters
         }
       }));
     }
-  }, [dispatch, vendor?._id, purchaseOrders.page, filters]);
+  }, [dispatch, vendor?._id, vendorPurchaseOrders.page, filters]);
 
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({
       ...prev,
       [key]: value
     }));
-    dispatch(setPurchaseOrdersPage(1));
+    dispatch(setVendorPurchaseOrdersPage(1));
   };
 
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= purchaseOrders.pages) {
-      dispatch(setPurchaseOrdersPage(newPage));
+    if (newPage >= 1 && newPage <= vendorPurchaseOrders.pages) {
+      dispatch(setVendorPurchaseOrdersPage(newPage));
     }
   };
 
   const formatCurrency = (amount) => {
+    if (!amount) return '$0.00';
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
-      currency: 'USD'
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
     }).format(amount);
   };
 
   const getVendorCount = (order) => {
     if (!order.items) return 0;
-    const vendors = new Set(order.items.map(item => item.vendorName));
+    const vendors = new Set(order.items.map(item => item.vendorName).filter(name => name));
     return vendors.size;
+  };
+
+  const getVendorNames = (order) => {
+    if (!order.items || order.items.length === 0) return 'No vendors';
+    
+    const vendorNames = [...new Set(order.items.map(item => item.vendorName).filter(name => name))];
+    
+    if (vendorNames.length === 0) return 'No vendors';
+    if (vendorNames.length === 1) return vendorNames[0];
+    if (vendorNames.length === 2) return vendorNames.join(' & ');
+    
+    return `${vendorNames[0]}, ${vendorNames[1]} +${vendorNames.length - 2} more`;
   };
 
   return (
@@ -98,7 +113,10 @@ const PurchaseOrdersTab = ({ vendor }) => {
           </div>
           <div className="flex items-center space-x-3">
             <button
-              onClick={() => dispatch(exportOrders({ type: 'purchase', filters }))}
+              onClick={() => {
+                // Export functionality
+                alert('Export feature coming soon');
+              }}
               className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
             >
               <Download className="w-4 h-4 mr-2" />
@@ -161,7 +179,7 @@ const PurchaseOrdersTab = ({ vendor }) => {
             </div>
             <div className="ml-3">
               <p className="text-sm text-gray-600">Total Orders</p>
-              <p className="text-xl font-bold text-gray-900">{purchaseOrders.total}</p>
+              <p className="text-xl font-bold text-gray-900">{vendorPurchaseOrders.total || 0}</p>
             </div>
           </div>
         </div>
@@ -174,7 +192,7 @@ const PurchaseOrdersTab = ({ vendor }) => {
             <div className="ml-3">
               <p className="text-sm text-gray-600">Completed</p>
               <p className="text-xl font-bold text-gray-900">
-                {purchaseOrders.data.filter(o => o.status === 'delivered').length}
+                {vendorPurchaseOrders.data?.filter(o => o.status === 'delivered').length || 0}
               </p>
             </div>
           </div>
@@ -188,7 +206,7 @@ const PurchaseOrdersTab = ({ vendor }) => {
             <div className="ml-3">
               <p className="text-sm text-gray-600">Vendors Used</p>
               <p className="text-xl font-bold text-gray-900">
-                {[...new Set(purchaseOrders.data.flatMap(o => o.items?.map(i => i.vendorName) || []))].length}
+                {[...new Set(vendorPurchaseOrders.data?.flatMap(o => o.items?.map(i => i.vendorName) || []))].length}
               </p>
             </div>
           </div>
@@ -202,7 +220,7 @@ const PurchaseOrdersTab = ({ vendor }) => {
             <div className="ml-3">
               <p className="text-sm text-gray-600">Total Spent</p>
               <p className="text-xl font-bold text-gray-900">
-                {formatCurrency(purchaseOrders.data.reduce((sum, order) => sum + (order.total || 0), 0))}
+                {formatCurrency(vendorPurchaseOrders.data?.reduce((sum, order) => sum + (order.total || 0), 0) || 0)}
               </p>
             </div>
           </div>
@@ -211,176 +229,186 @@ const PurchaseOrdersTab = ({ vendor }) => {
 
       {/* Orders Table */}
       <div className="bg-white shadow rounded-lg overflow-hidden">
-        {purchaseOrders.loading ? (
+        {vendorPurchaseOrders.loading ? (
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-            <span className="ml-4 text-gray-600">Loading orders...</span>
+            <span className="ml-4 text-gray-600">Loading purchase orders...</span>
           </div>
-        ) : purchaseOrders.error ? (
+        ) : vendorPurchaseOrders.error ? (
           <div className="p-6 text-center">
             <AlertCircle className="mx-auto h-12 w-12 text-red-400" />
-            <p className="mt-2 text-sm text-red-600">{purchaseOrders.error}</p>
+            <p className="mt-2 text-sm text-red-600">{vendorPurchaseOrders.error}</p>
           </div>
-        ) : purchaseOrders.data.length === 0 ? (
+        ) : vendorPurchaseOrders.data?.length === 0 ? (
           <div className="p-6 text-center">
             <Package className="mx-auto h-12 w-12 text-gray-400" />
-            <p className="mt-2 text-sm text-gray-600">No orders found</p>
+            <p className="mt-2 text-sm text-gray-600">No purchase orders found</p>
+            <p className="text-xs text-gray-500 mt-1">
+              This vendor hasn't placed any purchase orders yet
+            </p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Order Details
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Vendors
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Items & Total
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {purchaseOrders.data.map((order) => (
-                  <tr key={order._id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {order.orderNumber}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        <div className="flex items-center">
-                          <Calendar className="w-4 h-4 mr-1" />
-                          {format(new Date(order.createdAt), 'MMM d, yyyy')}
-                        </div>
-                        <div className="flex items-center mt-1">
-                          <Clock className="w-4 h-4 mr-1" />
-                          {format(new Date(order.createdAt), 'h:mm a')}
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {getVendorCount(order)} vendors
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {order.items?.slice(0, 2).map(item => item.vendorName).join(', ')}
-                        {order.items?.length > 2 && '...'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
-                        {order.items?.length || 0} items
-                      </div>
-                      <div className="text-sm font-bold text-gray-900">
-                        {formatCurrency(order.total || 0)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <StatusBadge status={order.status} />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => setSelectedOrder(order)}
-                          className="text-blue-600 hover:text-blue-900"
-                          title="View Details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
-                        <button
-                          onClick={() => dispatch(generateInvoice(order._id))}
-                          className="text-green-600 hover:text-green-900"
-                          title="Download Invoice"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order Details
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Vendors
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Items & Total
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {vendorPurchaseOrders.data?.map((order) => (
+                    <tr key={order._id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {order.orderNumber || 'N/A'}
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          <div className="flex items-center">
+                            <Calendar className="w-4 h-4 mr-1" />
+                            {format(new Date(order.createdAt), 'MMM d, yyyy')}
+                          </div>
+                          <div className="flex items-center mt-1">
+                            <Clock className="w-4 h-4 mr-1" />
+                            {format(new Date(order.createdAt), 'h:mm a')}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-900">
+                          {getVendorCount(order)} vendors
+                        </div>
+                        <div className="text-xs text-gray-500 truncate max-w-xs">
+                          {getVendorNames(order)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {order.items?.length || 0} items
+                        </div>
+                        <div className="text-sm font-bold text-gray-900">
+                          {formatCurrency(order.total || 0)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <StatusBadge status={order.status} />
+                        {order.paymentStatus && (
+                          <div className="text-xs text-gray-500 mt-1">
+                            Payment: {order.paymentStatus}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => setSelectedOrder(order)}
+                            className="text-blue-600 hover:text-blue-900"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => order._id && dispatch(generateInvoice(order._id))}
+                            className="text-green-600 hover:text-green-900"
+                            title="Download Invoice"
+                            disabled={!order._id}
+                          >
+                            <Download className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
 
-        {/* Pagination */}
-        {purchaseOrders.data.length > 0 && (
-          <div className="px-6 py-3 flex items-center justify-between border-t border-gray-200">
-            <div className="flex-1 flex justify-between sm:hidden">
-              <button
-                onClick={() => handlePageChange(purchaseOrders.page - 1)}
-                disabled={purchaseOrders.page === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <button
-                onClick={() => handlePageChange(purchaseOrders.page + 1)}
-                disabled={purchaseOrders.page === purchaseOrders.pages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
-            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
-              <div>
-                <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{(purchaseOrders.page - 1) * 10 + 1}</span> to{' '}
-                  <span className="font-medium">
-                    {Math.min(purchaseOrders.page * 10, purchaseOrders.total)}
-                  </span>{' '}
-                  of <span className="font-medium">{purchaseOrders.total}</span> results
-                </p>
-              </div>
-              <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+            {/* Pagination */}
+            {vendorPurchaseOrders.data?.length > 0 && vendorPurchaseOrders.pages > 1 && (
+              <div className="px-6 py-3 flex items-center justify-between border-t border-gray-200">
+                <div className="flex-1 flex justify-between sm:hidden">
                   <button
-                    onClick={() => handlePageChange(purchaseOrders.page - 1)}
-                    disabled={purchaseOrders.page === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    onClick={() => handlePageChange(vendorPurchaseOrders.page - 1)}
+                    disabled={vendorPurchaseOrders.page === 1}
+                    className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                   >
-                    <span className="sr-only">Previous</span>
-                    <ChevronLeft className="h-5 w-5" />
+                    Previous
                   </button>
-                  {[...Array(Math.min(5, purchaseOrders.pages))].map((_, i) => {
-                    const pageNumber = Math.max(1, Math.min(purchaseOrders.pages - 4, purchaseOrders.page - 2)) + i;
-                    if (pageNumber > 0 && pageNumber <= purchaseOrders.pages) {
-                      return (
-                        <button
-                          key={pageNumber}
-                          onClick={() => handlePageChange(pageNumber)}
-                          className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                            purchaseOrders.page === pageNumber
-                              ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                              : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                          }`}
-                        >
-                          {pageNumber}
-                        </button>
-                      );
-                    }
-                    return null;
-                  })}
                   <button
-                    onClick={() => handlePageChange(purchaseOrders.page + 1)}
-                    disabled={purchaseOrders.page === purchaseOrders.pages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    onClick={() => handlePageChange(vendorPurchaseOrders.page + 1)}
+                    disabled={vendorPurchaseOrders.page === vendorPurchaseOrders.pages}
+                    className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
                   >
-                    <span className="sr-only">Next</span>
-                    <ChevronRight className="h-5 w-5" />
+                    Next
                   </button>
-                </nav>
+                </div>
+                <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700">
+                      Showing <span className="font-medium">{(vendorPurchaseOrders.page - 1) * 10 + 1}</span> to{' '}
+                      <span className="font-medium">
+                        {Math.min(vendorPurchaseOrders.page * 10, vendorPurchaseOrders.total)}
+                      </span>{' '}
+                      of <span className="font-medium">{vendorPurchaseOrders.total}</span> results
+                    </p>
+                  </div>
+                  <div>
+                    <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                      <button
+                        onClick={() => handlePageChange(vendorPurchaseOrders.page - 1)}
+                        disabled={vendorPurchaseOrders.page === 1}
+                        className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <span className="sr-only">Previous</span>
+                        <ChevronLeft className="h-5 w-5" />
+                      </button>
+                      {[...Array(Math.min(5, vendorPurchaseOrders.pages))].map((_, i) => {
+                        const pageNumber = Math.max(1, Math.min(vendorPurchaseOrders.pages - 4, vendorPurchaseOrders.page - 2)) + i;
+                        if (pageNumber > 0 && pageNumber <= vendorPurchaseOrders.pages) {
+                          return (
+                            <button
+                              key={pageNumber}
+                              onClick={() => handlePageChange(pageNumber)}
+                              className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                                vendorPurchaseOrders.page === pageNumber
+                                  ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
+                                  : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
+                              }`}
+                            >
+                              {pageNumber}
+                            </button>
+                          );
+                        }
+                        return null;
+                      })}
+                      <button
+                        onClick={() => handlePageChange(vendorPurchaseOrders.page + 1)}
+                        disabled={vendorPurchaseOrders.page === vendorPurchaseOrders.pages}
+                        className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                      >
+                        <span className="sr-only">Next</span>
+                        <ChevronRight className="h-5 w-5" />
+                      </button>
+                    </nav>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -404,7 +432,7 @@ const PurchaseOrdersTab = ({ vendor }) => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm text-gray-600">Order Number</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedOrder.orderNumber}</p>
+                    <p className="text-sm font-medium text-gray-900">{selectedOrder.orderNumber || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-sm text-gray-600">Date</p>
@@ -425,7 +453,7 @@ const PurchaseOrdersTab = ({ vendor }) => {
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {selectedOrder.paymentStatus}
+                      {selectedOrder.paymentStatus || 'pending'}
                     </span>
                   </div>
                 </div>
@@ -451,37 +479,43 @@ const PurchaseOrdersTab = ({ vendor }) => {
               {/* Items by Vendor */}
               <div className="mb-6">
                 <h4 className="text-sm font-medium text-gray-900 mb-2">Items by Vendor</h4>
-                <div className="space-y-4">
-                  {selectedOrder.vendorOrders?.map((vendorOrder, index) => (
-                    <div key={index} className="border rounded-lg overflow-hidden">
-                      <div className="bg-gray-50 px-4 py-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm font-medium text-gray-900">{vendorOrder.vendorName}</span>
-                          <StatusBadge status={vendorOrder.status} small />
-                        </div>
-                      </div>
-                      <div className="p-4">
-                        {vendorOrder.items?.map((item, itemIndex) => (
-                          <div key={itemIndex} className="flex justify-between items-center py-2 border-b last:border-b-0">
-                            <div>
-                              <p className="text-sm font-medium text-gray-900">{item.productName}</p>
-                              <p className="text-sm text-gray-600">Qty: {item.quantity} × {formatCurrency(item.unitPrice)}</p>
-                            </div>
-                            <div className="text-sm font-bold text-gray-900">
-                              {formatCurrency(item.totalPrice)}
-                            </div>
+                {selectedOrder.vendorOrders?.length > 0 ? (
+                  <div className="space-y-4">
+                    {selectedOrder.vendorOrders.map((vendorOrder, index) => (
+                      <div key={index} className="border rounded-lg overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-2">
+                          <div className="flex justify-between items-center">
+                            <span className="text-sm font-medium text-gray-900">{vendorOrder.vendorName}</span>
+                            <StatusBadge status={vendorOrder.status} small />
                           </div>
-                        ))}
-                        <div className="flex justify-between items-center pt-2 mt-2 border-t">
-                          <span className="text-sm font-medium text-gray-900">Vendor Subtotal</span>
-                          <span className="text-sm font-bold text-gray-900">
-                            {formatCurrency(vendorOrder.subtotal || vendorOrder.items?.reduce((sum, item) => sum + item.totalPrice, 0) || 0)}
-                          </span>
+                        </div>
+                        <div className="p-4">
+                          {vendorOrder.items?.map((item, itemIndex) => (
+                            <div key={itemIndex} className="flex justify-between items-center py-2 border-b last:border-b-0">
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">{item.productName}</p>
+                                <p className="text-sm text-gray-600">Qty: {item.quantity} × {formatCurrency(item.unitPrice)}</p>
+                              </div>
+                              <div className="text-sm font-bold text-gray-900">
+                                {formatCurrency(item.totalPrice)}
+                              </div>
+                            </div>
+                          ))}
+                          <div className="flex justify-between items-center pt-2 mt-2 border-t">
+                            <span className="text-sm font-medium text-gray-900">Vendor Subtotal</span>
+                            <span className="text-sm font-bold text-gray-900">
+                              {formatCurrency(vendorOrder.subtotal || vendorOrder.items?.reduce((sum, item) => sum + item.totalPrice, 0) || 0)}
+                            </span>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <p className="text-sm text-gray-600">No vendor order details available</p>
+                  </div>
+                )}
               </div>
 
               {/* Totals */}
@@ -516,8 +550,9 @@ const PurchaseOrdersTab = ({ vendor }) => {
             </div>
             <div className="px-6 py-4 border-t flex justify-end space-x-3">
               <button
-                onClick={() => dispatch(generateInvoice(selectedOrder._id))}
+                onClick={() => selectedOrder._id && dispatch(generateInvoice(selectedOrder._id))}
                 className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                disabled={!selectedOrder._id}
               >
                 Download Invoice
               </button>

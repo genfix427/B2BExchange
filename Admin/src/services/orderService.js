@@ -1,60 +1,6 @@
 import { api } from './api';
 
 export const orderService = {
-  // Get vendor sell orders (where vendor is seller)
-  async getVendorSellOrders(vendorId, params = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.page) queryParams.append('page', params.page);
-      if (params.limit) queryParams.append('limit', params.limit);
-      if (params.status) queryParams.append('status', params.status);
-      if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
-      if (params.dateTo) queryParams.append('dateTo', params.dateTo);
-      if (params.search) queryParams.append('search', params.search);
-      
-      const queryString = queryParams.toString();
-      const url = `/admin/orders/vendors/${vendorId}/orders/sell${queryString ? `?${queryString}` : ''}`;
-      console.log('Fetching vendor sell orders from URL:', url);
-      
-      return await api.get(url);
-    } catch (error) {
-      console.error('Error fetching vendor sell orders:', error);
-      throw error;
-    }
-  },
-
-  // Get vendor purchase orders (where vendor is buyer)
-  async getVendorPurchaseOrders(vendorId, params = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      
-      if (params.page) queryParams.append('page', params.page);
-      if (params.limit) queryParams.append('limit', params.limit);
-      if (params.status) queryParams.append('status', params.status);
-      if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
-      if (params.dateTo) queryParams.append('dateTo', params.dateTo);
-      if (params.search) queryParams.append('search', params.search);
-      
-      const queryString = queryParams.toString();
-      const url = `/admin/orders/vendors/${vendorId}/orders/purchase${queryString ? `?${queryString}` : ''}`;
-      
-      return await api.get(url);
-    } catch (error) {
-      console.error('Error fetching vendor purchase orders:', error);
-      throw error;
-    }
-  },
-
-  // Get vendor order statistics
-  async getVendorOrderStats(vendorId, period = 'month') {
-    try {
-      return await api.get(`/admin/orders/vendors/${vendorId}/stats?period=${period}`);
-    } catch (error) {
-      console.error('Error fetching vendor order stats:', error);
-      throw error;
-    }
-  },
 
   // Get order details
   async getOrderDetails(orderId) {
@@ -117,12 +63,11 @@ export const orderService = {
       throw error;
     }
   },
+  //==================================================================XXXXXXXXXXXXXX
 
-//==================================================================
-  // Get admin dashboard stats
   async getDashboardStats() {
     try {
-      return await api.get('/admin/dashboard/stats');
+      return await api.get('/admin/orders/dashboard/stats');
     } catch (error) {
       console.error('Error fetching dashboard stats:', error);
       throw error;
@@ -142,6 +87,8 @@ export const orderService = {
       if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
       if (params.dateTo) queryParams.append('dateTo', params.dateTo);
       if (params.search) queryParams.append('search', params.search);
+      if (params.sortBy) queryParams.append('sortBy', params.sortBy);
+      if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
       
       const queryString = queryParams.toString();
       const url = `/admin/orders${queryString ? `?${queryString}` : ''}`;
@@ -149,6 +96,16 @@ export const orderService = {
       return await api.get(url);
     } catch (error) {
       console.error('Error fetching all orders:', error);
+      throw error;
+    }
+  },
+
+  // Get recent orders
+  async getRecentOrders(limit = 10) {
+    try {
+      return await api.get(`/admin/orders/recent?limit=${limit}`);
+    } catch (error) {
+      console.error('Error fetching recent orders:', error);
       throw error;
     }
   },
@@ -172,27 +129,69 @@ export const orderService = {
     }
   },
 
-  // Get recent orders
-  async getRecentOrders(limit = 10) {
-    try {
-      return await api.get(`/admin/orders?limit=${limit}&sortBy=createdAt&sortOrder=desc`);
-    } catch (error) {
-      console.error('Error fetching recent orders:', error);
-      throw error;
-    }
-  },
-
   // Get top vendors
   async getTopVendors(limit = 5) {
     try {
-      return await api.get(`/admin/orders/analytics/top-vendors?limit=${limit}`);
+      return await api.get(`/admin/orders/top-vendors?limit=${limit}`);
     } catch (error) {
       console.error('Error fetching top vendors:', error);
       throw error;
     }
   },
 
-  // Export orders
+  // Get vendor order stats
+  async getVendorOrderStats(vendorId, period = 'month') {
+    try {
+      return await api.get(`/admin/orders/vendors/${vendorId}/stats?period=${period}`);
+    } catch (error) {
+      console.error('Error fetching vendor order stats:', error);
+      throw error;
+    }
+  },
+
+  // Get vendor sell orders
+  async getVendorSellOrders(vendorId, params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.status) queryParams.append('status', params.status);
+      if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+      if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+      
+      const queryString = queryParams.toString();
+      const url = `/admin/orders/vendors/${vendorId}/orders/sell${queryString ? `?${queryString}` : ''}`;
+      
+      return await api.get(url);
+    } catch (error) {
+      console.error('Error fetching vendor sell orders:', error);
+      throw error;
+    }
+  },
+
+  // Get vendor purchase orders
+  async getVendorPurchaseOrders(vendorId, params = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      if (params.page) queryParams.append('page', params.page);
+      if (params.limit) queryParams.append('limit', params.limit);
+      if (params.status) queryParams.append('status', params.status);
+      if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
+      if (params.dateTo) queryParams.append('dateTo', params.dateTo);
+      
+      const queryString = queryParams.toString();
+      const url = `/admin/orders/vendors/${vendorId}/orders/purchase${queryString ? `?${queryString}` : ''}`;
+      
+      return await api.get(url);
+    } catch (error) {
+      console.error('Error fetching vendor purchase orders:', error);
+      throw error;
+    }
+  },
+
+  // Export orders to Excel
   async exportOrders(type = 'all', filters = {}) {
     try {
       const queryParams = new URLSearchParams();
@@ -229,5 +228,5 @@ export const orderService = {
       console.error('Error exporting orders:', error);
       throw error;
     }
-  },
+  }
 };

@@ -7,129 +7,6 @@ import PDFDocument from 'pdfkit';
 import fs from 'fs';
 import path from 'path';
 
-// @desc    Get all orders (sell and purchase) with filtering
-// @route   GET /api/admin/orders
-// @access  Private (Admin)
-export const getAllOrders = async (req, res, next) => {
-  try {
-    const {
-      page = 1,
-      limit = 20,
-      status = '',
-      type = '', // 'sell' or 'purchase'
-      vendorId = '',
-      dateFrom = '',
-      dateTo = '',
-      search = '',
-      sortBy = 'createdAt',
-      sortOrder = 'desc'
-    } = req.query;
-    
-    const skip = (page - 1) * limit;
-    const query = {};
-    
-    // Date filtering
-    if (dateFrom || dateTo) {
-      query.createdAt = {};
-      if (dateFrom) query.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) query.createdAt.$lte = new Date(dateTo + 'T23:59:59.999Z');
-    }
-    
-    // Status filtering
-    if (status) {
-      if (status.includes(',')) {
-        query.status = { $in: status.split(',') };
-      } else {
-        query.status = status;
-      }
-    }
-    
-    // Vendor-specific orders
-    if (vendorId) {
-      if (type === 'sell') {
-        // Orders where vendor is selling (items.vendor)
-        query['items.vendor'] = vendorId;
-      } else if (type === 'purchase') {
-        // Orders where vendor is buying (customer)
-        query.customer = vendorId;
-      }
-    }
-    
-    // Search functionality
-    if (search) {
-      query.$or = [
-        { orderNumber: { $regex: search, $options: 'i' } },
-        { customerName: { $regex: search, $options: 'i' } },
-        { 'items.vendorName': { $regex: search, $options: 'i' } },
-        { 'items.productName': { $regex: search, $options: 'i' } }
-      ];
-    }
-    
-    // Sorting
-    const sort = {};
-    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
-    
-    // Populate based on type
-    const populateFields = [
-      { path: 'customer', select: 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email phone' }
-    ];
-    
-    const orders = await Order.find(query)
-      .populate(populateFields)
-      .sort(sort)
-      .skip(skip)
-      .limit(parseInt(limit));
-    
-    // Transform orders to include type information
-    const transformedOrders = orders.map(order => {
-      let orderType = 'purchase';
-      let vendorInvolved = [];
-      
-      // Check if vendor is selling in this order
-      if (vendorId && query['items.vendor']) {
-        const isSelling = order.items.some(item => 
-          item.vendor.toString() === vendorId.toString()
-        );
-        if (isSelling) orderType = 'sell';
-      }
-      
-      // Get all unique vendors in this order
-      const sellingVendors = [...new Set(order.items.map(item => ({
-        id: item.vendor,
-        name: item.vendorName
-      })))];
-      
-      // Get purchase vendor info
-      const purchaseVendor = {
-        id: order.customer?._id,
-        name: order.customerName
-      };
-      
-      return {
-        ...order.toObject(),
-        orderType: vendorId ? orderType : 'mixed',
-        sellingVendors,
-        purchaseVendor,
-        itemCount: order.items.length,
-        vendorCount: sellingVendors.length
-      };
-    });
-    
-    const total = await Order.countDocuments(query);
-    
-    res.status(200).json({
-      success: true,
-      count: orders.length,
-      total,
-      page: parseInt(page),
-      pages: Math.ceil(total / limit),
-      data: transformedOrders
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // @desc    Get vendor-specific statistics
 // @route   GET /api/admin/vendors/:id/orders/stats
 // @access  Private (Admin)
@@ -538,45 +415,6 @@ export const getVendorPurchaseOrders = async (req, res, next) => {
 // @desc    Get top vendors
 // @route   GET /api/admin/orders/analytics/top-vendors
 // @access  Private (Admin)
-export const getTopVendors = async (req, res, next) => {
-  try {
-    const { limit = 5 } = req.query;
-    
-    const topVendors = await Order.aggregate([
-      {
-        $unwind: '$items'
-      },
-      {
-        $match: {
-          createdAt: { $gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) } // Last 30 days
-        }
-      },
-      {
-        $group: {
-          _id: '$items.vendor',
-          vendorName: { $first: '$items.vendorName' },
-          totalSales: { $sum: '$items.totalPrice' },
-          orderCount: { $sum: 1 },
-          itemCount: { $sum: '$items.quantity' }
-        }
-      },
-      {
-        $sort: { totalSales: -1 }
-      },
-      {
-        $limit: parseInt(limit)
-      }
-    ]);
-    
-    res.status(200).json({
-      success: true,
-      data: topVendors
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
 // @desc    Get admin dashboard statistics
 // @route   GET /api/admin/dashboard/stats
 // @access  Private (Admin)
@@ -584,90 +422,97 @@ export const getAdminDashboardStats = async (req, res, next) => {
   try {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfDay = new Date(now);
-    startOfDay.setHours(0, 0, 0, 0);
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfWeek = new Date(now);
     startOfWeek.setDate(now.getDate() - 7);
 
-    // Total platform statistics - FIXED aggregation
-    const platformStats = await Order.aggregate([
+    // Get total orders count and revenue
+    const [totalOrders, totalRevenue, avgOrderValue] = await Promise.all([
+      Order.countDocuments(),
+      Order.aggregate([
+        {
+          $group: {
+            _id: null,
+            total: { $sum: '$total' }
+          }
+        }
+      ]),
+      Order.aggregate([
+        {
+          $group: {
+            _id: null,
+            avg: { $avg: '$total' }
+          }
+        }
+      ])
+    ]);
+
+    // Get monthly stats
+    const monthlyStats = await Order.aggregate([
       {
-        $facet: {
-          // Lifetime stats
-          lifetime: [
-            {
-              $group: {
-                _id: null,
-                totalOrders: { $sum: 1 },
-                totalRevenue: { $sum: '$total' },
-                avgOrderValue: { $avg: '$total' }
-              }
-            }
-          ],
-          // Monthly stats
-          monthly: [
-            {
-              $match: {
-                createdAt: { $gte: startOfMonth }
-              }
-            },
-            {
-              $group: {
-                _id: null,
-                orders: { $sum: 1 },
-                revenue: { $sum: '$total' },
-                newCustomers: { $addToSet: '$customer' }
-              }
-            }
-          ],
-          // Daily stats
-          daily: [
-            {
-              $match: {
-                createdAt: { $gte: startOfDay }
-              }
-            },
-            {
-              $group: {
-                _id: null,
-                orders: { $sum: 1 },
-                revenue: { $sum: '$total' }
-              }
-            }
-          ],
-          // Status breakdown
-          statusBreakdown: [
-            {
-              $group: {
-                _id: '$status',
-                count: { $sum: 1 },
-                revenue: { $sum: '$total' }
-              }
-            }
-          ],
-          // Vendor count
-          vendorCount: [
-            {
-              $unwind: '$items'
-            },
-            {
-              $group: {
-                _id: '$items.vendor'
-              }
-            },
-            {
-              $count: 'totalVendors'
-            }
-          ]
+        $match: {
+          createdAt: { $gte: startOfMonth }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          orders: { $sum: 1 },
+          revenue: { $sum: '$total' }
         }
       }
     ]);
 
-    // Monthly revenue trend
+    // Get daily stats
+    const dailyStats = await Order.aggregate([
+      {
+        $match: {
+          createdAt: { $gte: startOfDay }
+        }
+      },
+      {
+        $group: {
+          _id: null,
+          orders: { $sum: 1 },
+          revenue: { $sum: '$total' }
+        }
+      }
+    ]);
+
+    // Get status breakdown
+    const statusBreakdown = await Order.aggregate([
+      {
+        $group: {
+          _id: '$status',
+          count: { $sum: 1 },
+          revenue: { $sum: '$total' }
+        }
+      }
+    ]);
+
+    // Get unique vendors from orders
+    const uniqueVendors = await Order.aggregate([
+      {
+        $unwind: '$items'
+      },
+      {
+        $group: {
+          _id: '$items.vendor'
+        }
+      },
+      {
+        $count: 'count'
+      }
+    ]);
+
+    // Monthly revenue trend (last 6 months)
+    const sixMonthsAgo = new Date(now);
+    sixMonthsAgo.setMonth(now.getMonth() - 6);
+
     const monthlyTrend = await Order.aggregate([
       {
         $match: {
-          createdAt: { $gte: new Date(now.setMonth(now.getMonth() - 12)) }
+          createdAt: { $gte: sixMonthsAgo }
         }
       },
       {
@@ -701,8 +546,7 @@ export const getAdminDashboardStats = async (req, res, next) => {
           vendorName: { $first: '$items.vendorName' },
           totalSales: { $sum: '$items.totalPrice' },
           orderCount: { $sum: 1 },
-          itemCount: { $sum: '$items.quantity' },
-          avgSaleValue: { $avg: '$items.totalPrice' }
+          itemCount: { $sum: '$items.quantity' }
         }
       },
       {
@@ -726,8 +570,7 @@ export const getAdminDashboardStats = async (req, res, next) => {
           customerName: { $first: '$customerName' },
           totalSpent: { $sum: '$total' },
           orderCount: { $sum: 1 },
-          avgOrderValue: { $avg: '$total' },
-          lastOrder: { $max: '$createdAt' }
+          avgOrderValue: { $avg: '$total' }
         }
       },
       {
@@ -738,67 +581,63 @@ export const getAdminDashboardStats = async (req, res, next) => {
       }
     ]);
 
-    // Recent orders
+    // Recent orders (last 10)
     const recentOrders = await Order.find()
-      .populate('customer', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba')
       .sort({ createdAt: -1 })
       .limit(10)
+      .populate('customer', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba')
       .lean();
 
-    // Add vendor names to recent orders
+    // Enhanced recent orders
     const enhancedRecentOrders = recentOrders.map(order => {
       const sellingVendors = [...new Set(order.items.map(item => item.vendorName))];
       return {
         ...order,
-        sellingVendors: sellingVendors.slice(0, 3), // Show top 3 vendors
+        sellingVendors: sellingVendors.slice(0, 3),
         vendorCount: sellingVendors.length
       };
     });
 
-    // Order status distribution for chart
-    const statusDistribution = await Order.aggregate([
-      {
-        $group: {
-          _id: '$status',
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $project: {
-          status: '$_id',
-          count: 1,
-          _id: 0
-        }
-      }
-    ]);
+    // Status distribution for chart
+    const statusDistribution = statusBreakdown.map(item => ({
+      status: item._id,
+      count: item.count
+    }));
 
     // Get total vendors count
     const totalVendors = await Vendor.countDocuments();
+
+    // Format monthly trend data
+    const formattedMonthlyTrend = monthlyTrend.map(item => ({
+      month: `${item._id.year}-${item._id.month.toString().padStart(2, '0')}`,
+      revenue: item.revenue || 0,
+      orders: item.orders || 0
+    }));
 
     res.status(200).json({
       success: true,
       data: {
         summary: {
-          lifetime: platformStats[0]?.lifetime[0] || {
-            totalOrders: 0,
-            totalRevenue: 0,
-            avgOrderValue: 0
+          lifetime: {
+            totalOrders: totalOrders || 0,
+            totalRevenue: totalRevenue[0]?.total || 0,
+            avgOrderValue: avgOrderValue[0]?.avg || 0
           },
-          monthly: platformStats[0]?.monthly[0] || {
-            orders: 0,
-            revenue: 0,
-            newCustomers: []
-          },
-          daily: platformStats[0]?.daily[0] || {
+          monthly: monthlyStats[0] || {
             orders: 0,
             revenue: 0
           },
-          totalVendors: totalVendors || 0
+          daily: dailyStats[0] || {
+            orders: 0,
+            revenue: 0
+          },
+          totalVendors: totalVendors || 0,
+          activeVendors: uniqueVendors[0]?.count || 0
         },
         analytics: {
-          monthlyTrend,
+          monthlyTrend: formattedMonthlyTrend,
           statusDistribution,
-          statusBreakdown: platformStats[0]?.statusBreakdown || []
+          statusBreakdown
         },
         rankings: {
           topSellingVendors: topVendors,
@@ -812,6 +651,310 @@ export const getAdminDashboardStats = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Error in getAdminDashboardStats:', error);
+    next(error);
+  }
+};
+
+// @desc    Get all orders (sell and purchase) with filtering
+// @route   GET /api/admin/orders
+// @access  Private (Admin)
+export const getAllOrders = async (req, res, next) => {
+  try {
+    const {
+      page = 1,
+      limit = 20,
+      status = '',
+      type = '', // 'sell' or 'purchase'
+      vendorId = '',
+      dateFrom = '',
+      dateTo = '',
+      search = '',
+      sortBy = 'createdAt',
+      sortOrder = 'desc'
+    } = req.query;
+    
+    const skip = (page - 1) * limit;
+    const query = {};
+    
+    // Date filtering
+    if (dateFrom || dateTo) {
+      query.createdAt = {};
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        query.createdAt.$gte = fromDate;
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        query.createdAt.$lte = toDate;
+      }
+    }
+    
+    // Status filtering
+    if (status && status !== 'all') {
+      query.status = status;
+    }
+    
+    // Vendor-specific orders
+    if (vendorId && mongoose.Types.ObjectId.isValid(vendorId)) {
+      if (type === 'sell') {
+        query['items.vendor'] = new mongoose.Types.ObjectId(vendorId);
+      } else if (type === 'purchase') {
+        query.customer = new mongoose.Types.ObjectId(vendorId);
+      }
+    }
+    
+    // Search functionality
+    if (search) {
+      query.$or = [
+        { orderNumber: { $regex: search, $options: 'i' } },
+        { customerName: { $regex: search, $options: 'i' } },
+        { 'items.vendorName': { $regex: search, $options: 'i' } },
+        { 'items.productName': { $regex: search, $options: 'i' } }
+      ];
+    }
+    
+    // Sorting
+    const sort = {};
+    sort[sortBy] = sortOrder === 'desc' ? -1 : 1;
+    
+    // Execute query
+    const [orders, total] = await Promise.all([
+      Order.find(query)
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      Order.countDocuments(query)
+    ]);
+    
+    // Transform orders to include type information
+    const transformedOrders = orders.map(order => {
+      let orderType = 'mixed';
+      
+      if (vendorId) {
+        const isSelling = order.items.some(item => 
+          item.vendor && item.vendor.toString() === vendorId.toString()
+        );
+        orderType = isSelling ? 'sell' : 'purchase';
+      }
+      
+      // Get all unique vendors in this order
+      const sellingVendors = [...new Set(order.items.map(item => ({
+        id: item.vendor,
+        name: item.vendorName
+      })))];
+      
+      return {
+        ...order,
+        orderType,
+        sellingVendors,
+        itemCount: order.items.length,
+        vendorCount: sellingVendors.length
+      };
+    });
+    
+    res.status(200).json({
+      success: true,
+      count: orders.length,
+      total,
+      page: parseInt(page),
+      pages: Math.ceil(total / limit),
+      data: transformedOrders
+    });
+  } catch (error) {
+    console.error('Error in getAllOrders:', error);
+    next(error);
+  }
+};
+
+// @desc    Get recent orders
+// @route   GET /api/admin/orders/recent
+// @access  Private (Admin)
+export const getRecentOrders = async (req, res, next) => {
+  try {
+    const { limit = 10 } = req.query;
+    
+    const orders = await Order.find()
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit))
+      .populate('customer', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email')
+      .lean();
+    
+    res.status(200).json({
+      success: true,
+      data: orders
+    });
+  } catch (error) {
+    console.error('Error in getRecentOrders:', error);
+    next(error);
+  }
+};
+
+// @desc    Get order analytics
+// @route   GET /api/admin/orders/analytics
+// @access  Private (Admin)
+export const getOrderAnalytics = async (req, res, next) => {
+  try {
+    const { groupBy = 'day', dateFrom, dateTo } = req.query;
+    
+    const matchStage = {};
+    
+    if (dateFrom || dateTo) {
+      matchStage.createdAt = {};
+      if (dateFrom) {
+        const fromDate = new Date(dateFrom);
+        fromDate.setHours(0, 0, 0, 0);
+        matchStage.createdAt.$gte = fromDate;
+      }
+      if (dateTo) {
+        const toDate = new Date(dateTo);
+        toDate.setHours(23, 59, 59, 999);
+        matchStage.createdAt.$lte = toDate;
+      }
+    }
+    
+    let groupStage;
+    
+    switch (groupBy) {
+      case 'hour':
+        groupStage = {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              day: { $dayOfMonth: '$createdAt' },
+              hour: { $hour: '$createdAt' }
+            },
+            orders: { $sum: 1 },
+            revenue: { $sum: '$total' }
+          }
+        };
+        break;
+      case 'day':
+        groupStage = {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' },
+              day: { $dayOfMonth: '$createdAt' }
+            },
+            orders: { $sum: 1 },
+            revenue: { $sum: '$total' }
+          }
+        };
+        break;
+      case 'week':
+        groupStage = {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              week: { $week: '$createdAt' }
+            },
+            orders: { $sum: 1 },
+            revenue: { $sum: '$total' }
+          }
+        };
+        break;
+      case 'month':
+      default:
+        groupStage = {
+          $group: {
+            _id: {
+              year: { $year: '$createdAt' },
+              month: { $month: '$createdAt' }
+            },
+            orders: { $sum: 1 },
+            revenue: { $sum: '$total' }
+          }
+        };
+    }
+    
+    const analytics = await Order.aggregate([
+      { $match: matchStage },
+      groupStage,
+      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.hour': 1 } }
+    ]);
+    
+    // Format dates for response
+    const formattedAnalytics = analytics.map(item => {
+      let dateLabel;
+      const { _id } = item;
+      
+      if (groupBy === 'hour') {
+        dateLabel = `${_id.year}-${_id.month.toString().padStart(2, '0')}-${_id.day.toString().padStart(2, '0')} ${_id.hour.toString().padStart(2, '0')}:00`;
+      } else if (groupBy === 'day') {
+        dateLabel = `${_id.year}-${_id.month.toString().padStart(2, '0')}-${_id.day.toString().padStart(2, '0')}`;
+      } else if (groupBy === 'week') {
+        dateLabel = `${_id.year}-W${_id.week.toString().padStart(2, '0')}`;
+      } else {
+        dateLabel = `${_id.year}-${_id.month.toString().padStart(2, '0')}`;
+      }
+      
+      return {
+        date: dateLabel,
+        orders: item.orders,
+        revenue: item.revenue
+      };
+    });
+    
+    res.status(200).json({
+      success: true,
+      data: {
+        groupBy,
+        analytics: formattedAnalytics,
+        summary: {
+          totalOrders: formattedAnalytics.reduce((sum, item) => sum + item.orders, 0),
+          totalRevenue: formattedAnalytics.reduce((sum, item) => sum + item.revenue, 0)
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error in getOrderAnalytics:', error);
+    next(error);
+  }
+};
+
+// @desc    Get top vendors
+// @route   GET /api/admin/orders/top-vendors
+// @access  Private (Admin)
+export const getTopVendors = async (req, res, next) => {
+  try {
+    const { limit = 5 } = req.query;
+    
+    const topVendors = await Order.aggregate([
+      {
+        $unwind: '$items'
+      },
+      {
+        $match: {
+          createdAt: { $gte: new Date(new Date().setMonth(new Date().getMonth() - 1)) }
+        }
+      },
+      {
+        $group: {
+          _id: '$items.vendor',
+          vendorName: { $first: '$items.vendorName' },
+          totalSales: { $sum: '$items.totalPrice' },
+          orderCount: { $sum: 1 },
+          itemCount: { $sum: '$items.quantity' }
+        }
+      },
+      {
+        $sort: { totalSales: -1 }
+      },
+      {
+        $limit: parseInt(limit)
+      }
+    ]);
+    
+    res.status(200).json({
+      success: true,
+      data: topVendors
+    });
+  } catch (error) {
+    console.error('Error in getTopVendors:', error);
     next(error);
   }
 };
@@ -1164,125 +1307,3 @@ export const updateVendorOrderStatus = async (req, res, next) => {
   }
 };
 
-// @desc    Get order analytics by date range
-// @route   GET /api/admin/orders/analytics
-// @access  Private (Admin)
-export const getOrderAnalytics = async (req, res, next) => {
-  try {
-    const { groupBy = 'day', dateFrom, dateTo } = req.query;
-    
-    const matchStage = {};
-    
-    if (dateFrom || dateTo) {
-      matchStage.createdAt = {};
-      if (dateFrom) matchStage.createdAt.$gte = new Date(dateFrom);
-      if (dateTo) matchStage.createdAt.$lte = new Date(dateTo + 'T23:59:59.999Z');
-    }
-    
-    let groupStage;
-    
-    switch (groupBy) {
-      case 'hour':
-        groupStage = {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' },
-              day: { $dayOfMonth: '$createdAt' },
-              hour: { $hour: '$createdAt' }
-            },
-            orders: { $sum: 1 },
-            revenue: { $sum: '$total' },
-            avgOrderValue: { $avg: '$total' }
-          }
-        };
-        break;
-      case 'day':
-        groupStage = {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' },
-              day: { $dayOfMonth: '$createdAt' }
-            },
-            orders: { $sum: 1 },
-            revenue: { $sum: '$total' },
-            avgOrderValue: { $avg: '$total' }
-          }
-        };
-        break;
-      case 'week':
-        groupStage = {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              week: { $week: '$createdAt' }
-            },
-            orders: { $sum: 1 },
-            revenue: { $sum: '$total' },
-            avgOrderValue: { $avg: '$total' }
-          }
-        };
-        break;
-      case 'month':
-      default:
-        groupStage = {
-          $group: {
-            _id: {
-              year: { $year: '$createdAt' },
-              month: { $month: '$createdAt' }
-            },
-            orders: { $sum: 1 },
-            revenue: { $sum: '$total' },
-            avgOrderValue: { $avg: '$total' }
-          }
-        };
-    }
-    
-    const analytics = await Order.aggregate([
-      { $match: matchStage },
-      groupStage,
-      { $sort: { '_id.year': 1, '_id.month': 1, '_id.day': 1, '_id.hour': 1 } }
-    ]);
-    
-    // Format dates for response
-    const formattedAnalytics = analytics.map(item => {
-      let dateLabel;
-      const { _id } = item;
-      
-      if (groupBy === 'hour') {
-        dateLabel = `${_id.year}-${_id.month.toString().padStart(2, '0')}-${_id.day.toString().padStart(2, '0')} ${_id.hour.toString().padStart(2, '0')}:00`;
-      } else if (groupBy === 'day') {
-        dateLabel = `${_id.year}-${_id.month.toString().padStart(2, '0')}-${_id.day.toString().padStart(2, '0')}`;
-      } else if (groupBy === 'week') {
-        dateLabel = `${_id.year}-W${_id.week.toString().padStart(2, '0')}`;
-      } else {
-        dateLabel = `${_id.year}-${_id.month.toString().padStart(2, '0')}`;
-      }
-      
-      return {
-        date: dateLabel,
-        orders: item.orders,
-        revenue: item.revenue,
-        avgOrderValue: item.avgOrderValue
-      };
-    });
-    
-    res.status(200).json({
-      success: true,
-      data: {
-        groupBy,
-        analytics: formattedAnalytics,
-        summary: {
-          totalOrders: formattedAnalytics.reduce((sum, item) => sum + item.orders, 0),
-          totalRevenue: formattedAnalytics.reduce((sum, item) => sum + item.revenue, 0),
-          averageRevenue: formattedAnalytics.length > 0 
-            ? formattedAnalytics.reduce((sum, item) => sum + item.revenue, 0) / formattedAnalytics.length 
-            : 0
-        }
-      }
-    });
-  } catch (error) {
-    next(error);
-  }
-};

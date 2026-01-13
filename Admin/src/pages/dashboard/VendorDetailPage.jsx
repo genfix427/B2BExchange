@@ -10,6 +10,12 @@ import {
   downloadAllDocuments
 } from '../../store/slices/vendorSlice'
 import {
+  fetchVendorProducts
+} from '../../store/slices/adminProductSlice'
+import {
+  clearOrderData
+} from '../../store/slices/orderSlice'
+import {
   AlertCircle,
   ArrowLeft,
   MoreVertical,
@@ -31,7 +37,12 @@ import {
   BarChart,
   History as HistoryIcon,
   Briefcase,
-  Banknote
+  Banknote,
+  TrendingUp,
+  DollarSign,
+  ShoppingBag,
+  Truck,
+  CheckSquare
 } from 'lucide-react'
 
 // Import tab components
@@ -43,6 +54,8 @@ import ProductsTab from '../../components/VendorDetails/ProductsTab'
 import OrdersTab from '../../components/VendorDetails/OrdersTab'
 import AnalyticsTab from '../../components/VendorDetails/AnalyticsTab'
 import HistoryTab from '../../components/VendorDetails/HistoryTab'
+import BankDetailsTab from '../../components/VendorDetails/BankDetailsTab'
+import Index from '../../components/VendorDetails/OrdersTab/Index'
 
 // Import modal components
 import RejectModal from '../../components/VendorDetails/modals/RejectModal'
@@ -59,19 +72,17 @@ import { useLicenses } from '../../components/VendorDetails/hooks/useLicenses'
 import { useUtilities } from '../../components/VendorDetails/hooks/useUtilities'
 import { useIcons } from '../../components/VendorDetails/hooks/useIcons'
 
-import { fetchVendorProducts } from '../../store/slices/adminProductSlice'
-
 // Import date formatting
 import { format } from 'date-fns'
-import BankDetailsTab from '../../components/VendorDetails/BankDetailsTab'
 
 const VendorDetailPage = () => {
   const { id } = useParams()
   const navigate = useNavigate()
   const dispatch = useDispatch()
+  
   const { selectedVendor, isLoading, error } = useSelector((state) => state.vendors)
   const { vendorProducts } = useSelector((state) => state.adminProducts)
-
+  const { sellOrders, purchaseOrders, stats } = useSelector((state) => state.orders)
 
   const [activeTab, setActiveTab] = useState('info')
 
@@ -81,30 +92,29 @@ const VendorDetailPage = () => {
   const { getStatusIcon, getDocumentIcon } = useIcons()
 
   const {
-  showRejectModal,
-  setShowRejectModal,
-  rejectionReason,
-  setRejectionReason,
-  showSuspendModal,
-  setShowSuspendModal,
-  suspensionReason,
-  setSuspensionReason,
-  showReactivateModal,
-  setShowReactivateModal,
-  handleApprove,
-  handleReject,
-  handleSuspend,
-  handleReactivate
-} = useModals(
-  id,
-  dispatch,
-  fetchVendorDetails,
-  approveVendor,
-  rejectVendor,
-  suspendVendor,
-  reactivateVendor
-)
-
+    showRejectModal,
+    setShowRejectModal,
+    rejectionReason,
+    setRejectionReason,
+    showSuspendModal,
+    setShowSuspendModal,
+    suspensionReason,
+    setSuspensionReason,
+    showReactivateModal,
+    setShowReactivateModal,
+    handleApprove,
+    handleReject,
+    handleSuspend,
+    handleReactivate
+  } = useModals(
+    id,
+    dispatch,
+    fetchVendorDetails,
+    approveVendor,
+    rejectVendor,
+    suspendVendor,
+    reactivateVendor
+  )
 
   const {
     documents,
@@ -130,14 +140,50 @@ const VendorDetailPage = () => {
   }, [dispatch, id])
 
   useEffect(() => {
-  if (selectedVendor?._id) {
-    dispatch(fetchVendorProducts({ vendorId: selectedVendor._id }))
+    if (selectedVendor?._id) {
+      dispatch(fetchVendorProducts({ vendorId: selectedVendor._id }))
+    }
+  }, [dispatch, selectedVendor?._id])
+
+  useEffect(() => {
+    // Clean up order data when component unmounts
+    return () => {
+      dispatch(clearOrderData())
+    }
+  }, [dispatch])
+
+  // Calculate stats for quick view
+  const calculateQuickStats = () => {
+    const sellRevenue = sellOrders.data?.reduce((sum, order) => sum + (order.total || 0), 0) || 0
+    const purchaseSpent = purchaseOrders.data?.reduce((sum, order) => sum + (order.total || 0), 0) || 0
+    
+    return {
+      sellOrders: sellOrders.total || 0,
+      purchaseOrders: purchaseOrders.total || 0,
+      sellRevenue,
+      purchaseSpent,
+      totalRevenue: sellRevenue + purchaseSpent,
+      avgOrderValue: sellOrders.total > 0 ? sellRevenue / sellOrders.total : 0
+    }
   }
-}, [dispatch, selectedVendor?._id])
 
-// Or better: Create a utility function to get count from vendor data
-const getProductsCount = () => vendorProducts?.length ?? 0;
+  const quickStats = calculateQuickStats()
 
+  const getProductsCount = () => vendorProducts?.length ?? 0
+
+  const getOrderStats = () => {
+    const deliveredSell = sellOrders.data?.filter(o => o.status === 'delivered').length || 0
+    const deliveredPurchase = purchaseOrders.data?.filter(o => o.status === 'delivered').length || 0
+    
+    return {
+      deliveredSell,
+      deliveredPurchase,
+      pendingSell: sellOrders.data?.filter(o => o.status === 'pending').length || 0,
+      pendingPurchase: purchaseOrders.data?.filter(o => o.status === 'pending').length || 0
+    }
+  }
+
+  const orderStats = getOrderStats()
 
   if (isLoading) {
     return (
@@ -184,6 +230,15 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
 
   const statusConfig = getStatusConfig(selectedVendor.status)
   const StatusIcon = getStatusIcon(selectedVendor.status)
+
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    }).format(amount)
+  }
 
   return (
     <div className="space-y-6">
@@ -266,8 +321,8 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
         </div>
       </div>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+      {/* Quick Stats - Enhanced with Order Data */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
             <div className="p-2 bg-blue-100 rounded-lg">
@@ -307,35 +362,100 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
             <div className="p-2 bg-orange-100 rounded-lg">
-              <ShoppingCart className="w-6 h-6 text-orange-600" />
+              <ShoppingBag className="w-6 h-6 text-orange-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Status</p>
-              <p className="text-sm font-bold text-gray-900 capitalize">{selectedVendor.status}</p>
-            </div>
-          </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="flex items-center">
-            <div className="p-2 bg-indigo-100 rounded-lg">
-              <Building className="w-6 h-6 text-indigo-600" />
-            </div>
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Locations</p>
-              <p className="text-xl font-bold text-gray-900">
-                {selectedVendor.pharmacyQuestions?.numberOfLocations || 1}
+              <p className="text-sm font-medium text-gray-600">Sell Orders</p>
+              <p className="text-xl font-bold text-gray-900">{quickStats.sellOrders}</p>
+              <p className="text-xs text-green-600">
+                {orderStats.deliveredSell} delivered
               </p>
             </div>
           </div>
         </div>
         <div className="bg-white rounded-lg shadow p-4">
           <div className="flex items-center">
-            <div className="p-2 bg-pink-100 rounded-lg">
-              <Star className="w-6 h-6 text-pink-600" />
+            <div className="p-2 bg-indigo-100 rounded-lg">
+              <ShoppingCart className="w-6 h-6 text-indigo-600" />
             </div>
             <div className="ml-3">
-              <p className="text-sm font-medium text-gray-600">Rating</p>
-              <p className="text-xl font-bold text-gray-900">4.8/5</p>
+              <p className="text-sm font-medium text-gray-600">Purchase Orders</p>
+              <p className="text-xl font-bold text-gray-900">{quickStats.purchaseOrders}</p>
+              <p className="text-xs text-green-600">
+                {orderStats.deliveredPurchase} delivered
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center">
+            <div className="p-2 bg-teal-100 rounded-lg">
+              <DollarSign className="w-6 h-6 text-teal-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              <p className="text-xl font-bold text-gray-900">{formatCurrency(quickStats.sellRevenue)}</p>
+              <p className="text-xs text-gray-600">
+                Avg: {formatCurrency(quickStats.avgOrderValue)}
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Order Performance Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Sell Performance</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(quickStats.sellRevenue)}
+              </p>
+              <p className="text-xs text-gray-500">
+                {quickStats.sellOrders} orders • {sellOrders.data?.length || 0} active
+              </p>
+            </div>
+            <div className={`p-2 rounded-lg ${
+              quickStats.sellRevenue > 10000 ? 'bg-green-100' : 
+              quickStats.sellRevenue > 5000 ? 'bg-yellow-100' : 'bg-red-100'
+            }`}>
+              <TrendingUp className={`w-6 h-6 ${
+                quickStats.sellRevenue > 10000 ? 'text-green-600' : 
+                quickStats.sellRevenue > 5000 ? 'text-yellow-600' : 'text-red-600'
+              }`} />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Purchase Activity</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(quickStats.purchaseSpent)}
+              </p>
+              <p className="text-xs text-gray-500">
+                {quickStats.purchaseOrders} orders • {orderStats.pendingPurchase} pending
+              </p>
+            </div>
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <ShoppingCart className="w-6 h-6 text-blue-600" />
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white rounded-lg shadow p-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Products</p>
+              <p className="text-2xl font-bold text-gray-900">{getProductsCount()}</p>
+              <p className="text-xs text-gray-500">
+                Active in catalog
+              </p>
+            </div>
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Package className="w-6 h-6 text-purple-600" />
             </div>
           </div>
         </div>
@@ -351,10 +471,12 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
             { id: 'contacts', label: 'Contacts', icon: UsersIcon },
             { id: 'bank', label: 'Bank Account', icon: Banknote, hasBankAccount: !!selectedVendor.bankAccount },
             { id: 'products', label: 'Products', icon: Package, badge: getProductsCount() },
-            { id: 'orders', label: 'Orders', icon: ShoppingCart },
+            { id: 'orders', label: 'Orders', icon: ShoppingCart, 
+              badge: quickStats.sellOrders + quickStats.purchaseOrders > 0 ? 
+                quickStats.sellOrders + quickStats.purchaseOrders : null },
             { id: 'analytics', label: 'Analytics', icon: BarChart },
             { id: 'history', label: 'History', icon: HistoryIcon }
-          ].map(({ id, label, icon: Icon, badge }) => (
+          ].map(({ id, label, icon: Icon, badge, hasBankAccount }) => (
             <button
               key={id}
               onClick={() => setActiveTab(id)}
@@ -365,9 +487,18 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
             >
               <Icon className="w-4 h-4 mr-2" />
               {label}
-              {badge && (
-                <span className="ml-2 bg-gray-100 text-gray-600 text-xs px-2 py-0.5 rounded-full">
+              {badge !== undefined && badge !== null && (
+                <span className={`ml-2 text-xs px-2 py-0.5 rounded-full ${
+                  id === 'orders' && badge > 0 
+                    ? 'bg-blue-100 text-blue-800' 
+                    : 'bg-gray-100 text-gray-600'
+                }`}>
                   {badge}
+                </span>
+              )}
+              {id === 'bank' && hasBankAccount && (
+                <span className="ml-2 bg-green-100 text-green-800 text-xs px-2 py-0.5 rounded-full">
+                  ✓
                 </span>
               )}
             </button>
@@ -410,6 +541,7 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
         {activeTab === 'contacts' && (
           <ContactsTab vendor={selectedVendor} />
         )}
+
         {activeTab === 'bank' && (
           <BankDetailsTab vendor={selectedVendor} />
         )}
@@ -419,7 +551,7 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
         )}
 
         {activeTab === 'orders' && (
-          <OrdersTab vendor={selectedVendor} />
+          <Index vendor={selectedVendor} />
         )}
 
         {activeTab === 'analytics' && (
@@ -431,22 +563,160 @@ const getProductsCount = () => vendorProducts?.length ?? 0;
         )}
       </div>
 
+      {/* Order Status Summary */}
       <div className="bg-white rounded-lg shadow p-4">
-  <div className="flex items-center">
-    <div className="p-2 bg-teal-100 rounded-lg">
-      <Banknote className="w-6 h-6 text-teal-600" />
-    </div>
-    <div className="ml-3">
-      <p className="text-sm font-medium text-gray-600">Bank Account</p>
-      <p className="text-sm font-bold text-gray-900">
-        {selectedVendor.bankAccount ? 'Configured' : 'Not Setup'}
-      </p>
-      {selectedVendor.bankAccount?.achAuthorization && (
-        <span className="text-xs text-emerald-600">ACH Active</span>
-      )}
-    </div>
-  </div>
-  </div>
+        <h3 className="text-sm font-semibold text-gray-900 mb-4">Order Status Overview</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Pending Orders</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {orderStats.pendingSell + orderStats.pendingPurchase}
+                </p>
+              </div>
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <Clock className="w-6 h-6 text-yellow-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {orderStats.pendingSell} sell • {orderStats.pendingPurchase} purchase
+            </div>
+          </div>
+          
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Processing</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {sellOrders.data?.filter(o => o.status === 'processing').length || 0}
+                </p>
+              </div>
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <Package className="w-6 h-6 text-blue-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              In progress
+            </div>
+          </div>
+          
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Shipped</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {sellOrders.data?.filter(o => o.status === 'shipped').length || 0}
+                </p>
+              </div>
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Truck className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              In transit
+            </div>
+          </div>
+          
+          <div className="border rounded-lg p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Delivered</p>
+                <p className="text-xl font-bold text-gray-900">
+                  {orderStats.deliveredSell + orderStats.deliveredPurchase}
+                </p>
+              </div>
+              <div className="p-2 bg-green-100 rounded-lg">
+                <CheckSquare className="w-6 h-6 text-green-600" />
+              </div>
+            </div>
+            <div className="mt-2 text-xs text-gray-500">
+              {orderStats.deliveredSell} sell • {orderStats.deliveredPurchase} purchase
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Bank Account Status */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center">
+            <div className="p-2 bg-teal-100 rounded-lg">
+              <Banknote className="w-6 h-6 text-teal-600" />
+            </div>
+            <div className="ml-3">
+              <p className="text-sm font-medium text-gray-600">Bank Account Status</p>
+              <p className="text-sm font-bold text-gray-900">
+                {selectedVendor.bankAccount ? 'Configured' : 'Not Setup'}
+              </p>
+              {selectedVendor.bankAccount?.achAuthorization && (
+                <span className="text-xs text-emerald-600">ACH Authorization Active</span>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={() => setActiveTab('bank')}
+            className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            View Details
+          </button>
+        </div>
+      </div>
+
+      {/* Recent Activity Preview */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-semibold text-gray-900">Recent Activity</h3>
+          <button
+            onClick={() => setActiveTab('history')}
+            className="text-sm text-blue-600 hover:text-blue-800"
+          >
+            View All →
+          </button>
+        </div>
+        <div className="space-y-3">
+          {sellOrders.data?.slice(0, 3).map((order) => (
+            <div key={order._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Sell Order: {order.orderNumber}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {order.customerName} • {formatCurrency(order.total)}
+                </p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
+                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-blue-100 text-blue-800'
+              }`}>
+                {order.status}
+              </span>
+            </div>
+          ))}
+          {purchaseOrders.data?.slice(0, 2).map((order) => (
+            <div key={order._id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+              <div>
+                <p className="text-sm font-medium text-gray-900">
+                  Purchase: {order.orderNumber}
+                </p>
+                <p className="text-xs text-gray-500">
+                  From {order.items?.[0]?.vendorName || 'multiple vendors'} • {formatCurrency(order.total)}
+                </p>
+              </div>
+              <span className={`text-xs px-2 py-1 rounded-full ${
+                order.status === 'delivered' ? 'bg-green-100 text-green-800' :
+                order.status === 'shipped' ? 'bg-orange-100 text-orange-800' :
+                order.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                'bg-blue-100 text-blue-800'
+              }`}>
+                {order.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
 
       {/* Modals */}
       <RejectModal

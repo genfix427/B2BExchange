@@ -5,6 +5,7 @@ import { combineReducers } from 'redux'
 import adminAuthReducer from './slices/adminAuthSlice'
 import vendorReducer from './slices/vendorSlice'
 import adminProductReducer from './slices/adminProductSlice';
+import orderReducer from './slices/orderSlice';
 
 const persistConfig = {
   key: 'adminRoot',
@@ -16,6 +17,7 @@ const rootReducer = combineReducers({
   adminAuth: adminAuthReducer,
   vendors: vendorReducer,
   adminProducts: adminProductReducer,
+  orders: orderReducer,
 })
 
 const persistedReducer = persistReducer(persistConfig, rootReducer)

@@ -19,7 +19,9 @@ import authRoutes from './routes/auth.routes.js';
 import vendorRoutes from './routes/vendor.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import profileRoutes from './routes/profile.routes.js';
+
 import adminAuthRoutes from './routes/adminAuth.routes.js';
+import adminOrderRoutes from './routes/admin/order.routes.js';
 
 import vendorProductRoutes from './routes/vendor/product.routes.js';
 import storeProductRoutes from './routes/store/product.routes.js';
@@ -123,7 +125,9 @@ app.use('/api/admin/auth', adminAuthRoutes);
 
 app.use('/api/vendor/products', vendorProductRoutes);
 app.use('/api/store/products', storeProductRoutes);
+
 app.use('/api/admin/products', adminProductRoutes);
+app.use('/api/admin/orders', adminOrderRoutes);
 
 app.use('/api/store/cart', cartRoutes);
 app.use('/api/store/wishlist', wishlistRoutes);

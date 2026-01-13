@@ -75,7 +75,7 @@ export const orderService = {
   },
 
   // Get all orders
-  async getAllOrders(params = {}) {
+   async getAllOrders(params = {}) {
     try {
       const queryParams = new URLSearchParams();
       
@@ -87,8 +87,6 @@ export const orderService = {
       if (params.dateFrom) queryParams.append('dateFrom', params.dateFrom);
       if (params.dateTo) queryParams.append('dateTo', params.dateTo);
       if (params.search) queryParams.append('search', params.search);
-      if (params.sortBy) queryParams.append('sortBy', params.sortBy);
-      if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder);
       
       const queryString = queryParams.toString();
       const url = `/admin/orders${queryString ? `?${queryString}` : ''}`;
@@ -96,6 +94,87 @@ export const orderService = {
       return await api.get(url);
     } catch (error) {
       console.error('Error fetching all orders:', error);
+      throw error;
+    }
+  },
+
+  // Update order status
+  async updateOrderStatus(orderId, data) {
+    try {
+      return await api.put(`/admin/orders/${orderId}/status`, data);
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      throw error;
+    }
+  },
+
+  // Generate invoice
+  async generateInvoice(orderId) {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/orders/${orderId}/invoice`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to generate invoice');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice-${orderId}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error generating invoice:', error);
+      throw error;
+    }
+  },
+
+  // Export orders
+  async exportOrders(type = 'all', filters = {}) {
+    try {
+      const queryParams = new URLSearchParams();
+      queryParams.append('type', type);
+      
+      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
+      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
+      
+      const queryString = queryParams.toString();
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/orders/export?${queryString}`, {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to export orders');
+      }
+
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
+      return { success: true };
+    } catch (error) {
+      console.error('Error exporting orders:', error);
       throw error;
     }
   },

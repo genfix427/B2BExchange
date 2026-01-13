@@ -18,6 +18,7 @@ import NotFoundPage from './pages/NotFoundPage'
 
 // Components
 import AdminProtectedRoute from './components/auth/ProtectedRoute'
+import AdminOrdersPage from './pages/dashboard/AdminOrdersPage'
 
 const App = () => {
   // const dispatch = useDispatch()
@@ -48,6 +49,7 @@ const App = () => {
           <Route path="vendors" element={<VendorManagementPage />} />
           <Route path="vendors/:id" element={<VendorDetailPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="orders" element={<AdminOrdersPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
 

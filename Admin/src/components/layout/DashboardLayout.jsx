@@ -13,6 +13,7 @@ import {
   Bell,
   ChevronDown,
   LogOut,
+  ShoppingCart,
   User
 } from 'lucide-react'
 
@@ -34,6 +35,7 @@ const DashboardLayout = () => {
     { name: 'Vendor Approval', href: '/admin/vendors/pending', icon: UserCheck },
     { name: 'Vendor Management', href: '/admin/vendors', icon: Users },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
+    { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
     { name: 'Settings', href: '/admin/settings', icon: Settings }
   ]
 

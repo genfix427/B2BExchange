@@ -9,6 +9,7 @@ import {
   BarChart3, 
   Settings, 
   LogOut,
+  ShoppingCart,
   Building2
 } from 'lucide-react'
 
@@ -26,6 +27,7 @@ const navItems = [
   { to: 'vendors/pending', icon: FileCheck, label: 'Pending Approvals' },
   { to: 'vendors', icon: Users, label: 'Vendor Management' },
   { to: 'analytics', icon: BarChart3, label: 'Analytics' },
+  { to: 'orders', icon: ShoppingCart, label: 'Orders' },
   { to: 'settings', icon: Settings, label: 'Settings' },
 ]
   

@@ -35,6 +35,11 @@ export const productService = {
     return response;
   },
 
+  async getRecentProducts() {
+    const response = await api.get('/admin/products/recent');
+    return response;
+  },
+
   // Public store operations
   async getStoreProducts(params = {}) {
     const query = new URLSearchParams(params).toString();

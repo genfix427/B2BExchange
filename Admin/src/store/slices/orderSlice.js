@@ -136,6 +136,19 @@ export const exportOrders = createAsyncThunk(
     }
 );
 
+export const clearOrderNotifications = createAsyncThunk(
+    'orders/clearOrderNotifications',
+    async (_, { rejectWithValue }) => {
+        try {
+            // Store timestamp in localStorage
+            localStorage.setItem('orderNotificationsClearedAt', new Date().toISOString());
+            return { success: true, timestamp: new Date().toISOString() };
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to clear notifications');
+        }
+    }
+);
+
 const initialState = {
     dashboardStats: {
         data: null,
@@ -204,7 +217,11 @@ const initialState = {
         loading: false,
         error: null
     },
-    exportLoading: false
+    exportLoading: false,
+    notifications: {
+        lastCleared: localStorage.getItem('orderNotificationsClearedAt') || null,
+        unreadCount: 0
+    }
 };
 
 const orderSlice = createSlice({
@@ -395,6 +412,22 @@ const orderSlice = createSlice({
             .addCase(exportOrders.rejected, (state) => {
                 state.exportLoading = false;
             });
+
+            builder
+            .addCase(clearOrderNotifications.pending, (state) => {
+                // Optionally set loading state if needed
+            })
+            .addCase(clearOrderNotifications.fulfilled, (state, action) => {
+                state.notifications.lastCleared = action.payload.timestamp;
+                state.notifications.unreadCount = 0;
+                // Optionally clear recent orders data to reduce memory usage
+                // state.recentOrders.data = state.recentOrders.data.filter(order => 
+                //     new Date(order.createdAt) <= new Date(action.payload.timestamp)
+                // );
+            })
+            .addCase(clearOrderNotifications.rejected, (state, action) => {
+                console.error('Failed to clear notifications:', action.payload);
+            });
     }
 
 });
@@ -406,6 +439,7 @@ export const {
     setVendorPurchaseOrdersPage,
     setOrdersPage,
     setAllOrdersPage,
+    updateNotificationCount
 } = orderSlice.actions;
 
 export default orderSlice.reducer;

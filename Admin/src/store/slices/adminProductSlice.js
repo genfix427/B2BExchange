@@ -98,10 +98,40 @@ export const fetchVendorProductStats = createAsyncThunk(
     }
 );
 
+export const fetchRecentProducts = createAsyncThunk(
+    'adminProducts/fetchRecentProducts',
+    async (limit = 10, { rejectWithValue }) => {
+        try {
+            const response = await productService.getRecentProducts(limit);
+            return response.data;
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to fetch recent products');
+        }
+    }
+);
+
+// NEW: Clear product notifications
+export const clearProductNotifications = createAsyncThunk(
+    'adminProducts/clearProductNotifications',
+    async (_, { rejectWithValue }) => {
+        try {
+            localStorage.setItem('productNotificationsClearedAt', new Date().toISOString());
+            return { success: true, timestamp: new Date().toISOString() };
+        } catch (error) {
+            return rejectWithValue(error.message || 'Failed to clear notifications');
+        }
+    }
+);
+
 // Initial state
 const initialState = {
     products: [],
     vendorProducts: [], // Add this
+    recentProducts: { // NEW: for notifications
+        data: [],
+        loading: false,
+        error: null
+    },
     currentProduct: null,
     loading: false,
     error: null,
@@ -121,13 +151,23 @@ const initialState = {
         totalVendors: 0,
         totalStock: 0,
         totalValue: 0,
-        avgPrice: 0
+        avgPrice: 0,
+        productsAddedToday: 0, // NEW
+        productsAddedThisWeek: 0, // NEW
+        recentVendorsWithProducts: 0 // NEW
     },
     pagination: {
         page: 1,
         limit: 20,
         total: 0,
         pages: 1
+    },
+     notifications: {
+        lastCleared: localStorage.getItem('productNotificationsClearedAt') || null,
+        unreadCount: 0,
+        newProductsCount: 0,
+        lowStockCount: 0,
+        outOfStockCount: 0
     }
 };
 
@@ -147,6 +187,9 @@ const adminProductSlice = createSlice({
         },
         resetCurrentProduct: (state) => {
             state.currentProduct = null;
+        },
+        updateProductNotificationCount: (state, action) => {
+            state.notifications.unreadCount = action.payload;
         }
     },
     extraReducers: (builder) => {
@@ -271,8 +314,36 @@ const adminProductSlice = createSlice({
                 state.loading = false;
                 state.error = action.payload;
             })
+
+            // Fetch Recent Products (NEW)
+            .addCase(fetchRecentProducts.pending, (state) => {
+                state.recentProducts.loading = true;
+                state.recentProducts.error = null;
+            })
+            .addCase(fetchRecentProducts.fulfilled, (state, action) => {
+                state.recentProducts.loading = false;
+                state.recentProducts.data = action.payload || [];
+            })
+            .addCase(fetchRecentProducts.rejected, (state, action) => {
+                state.recentProducts.loading = false;
+                state.recentProducts.error = action.payload;
+            })
+
+            // Clear Product Notifications (NEW)
+            .addCase(clearProductNotifications.pending, (state) => {
+                // Optional loading state
+            })
+            .addCase(clearProductNotifications.fulfilled, (state, action) => {
+                state.notifications.lastCleared = action.payload.timestamp;
+                state.notifications.unreadCount = 0;
+                state.notifications.newProductsCount = 0;
+            })
+            .addCase(clearProductNotifications.rejected, (state, action) => {
+                console.error('Failed to clear product notifications:', action.payload);
+            });
+
     }
 });
 
-export const { clearError, clearSuccess, setCurrentProduct, resetCurrentProduct } = adminProductSlice.actions;
+export const { clearError, clearSuccess, setCurrentProduct, resetCurrentProduct, updateProductNotificationCount } = adminProductSlice.actions;
 export default adminProductSlice.reducer;

@@ -5,7 +5,8 @@ import {
   updateProductAdmin,
   deleteProductAdmin,
   getProductStatsAdmin,
-  getVendorProducts // Add this
+  getVendorProducts, // Add this
+  getRecentProducts
 } from '../../controllers/admin/product.controller.js';
 import { adminProtect } from '../../middleware/auth.middleware.js';
 
@@ -19,6 +20,8 @@ router.route('/')
 
 router.route('/stats')
   .get(getProductStatsAdmin);
+
+router.get('/recent', getRecentProducts);
 
 // Add this new route for vendor-specific products
 router.route('/vendor/:vendorId')

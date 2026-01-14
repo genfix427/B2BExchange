@@ -391,3 +391,128 @@ export const getVendorProductStats = async (req, res, next) => {
     next(error);
   }
 };
+
+// Add to your product controller
+
+// @desc    Get recent products for notifications
+// @route   GET /api/admin/products/recent
+// @access  Private (Admin)
+export const getRecentProducts = async (req, res, next) => {
+    try {
+        const { limit = 10 } = req.query;
+        
+        const recentProducts = await Product.find()
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit))
+            .populate('vendor', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email')
+            .lean();
+        
+        // Format response
+        const formattedProducts = recentProducts.map(product => ({
+            _id: product._id,
+            productName: product.productName,
+            ndcNumber: product.ndcNumber,
+            price: product.price,
+            quantityInStock: product.quantityInStock,
+            status: product.status,
+            category: product.category,
+            vendorName: product.vendor?.pharmacyInfo?.legalBusinessName || product.vendor?.pharmacyInfo?.dba || 'Unknown',
+            vendorEmail: product.vendor?.email,
+            createdAt: product.createdAt,
+            image: product.image
+        }));
+        
+        res.status(200).json({
+            success: true,
+            data: formattedProducts
+        });
+    } catch (error) {
+        console.error('Error in getRecentProducts:', error);
+        next(error);
+    }
+};
+
+// @desc    Get admin product stats with enhanced data
+// @route   GET /api/admin/products/stats
+// @access  Private (Admin)
+export const getAdminProductStats = async (req, res, next) => {
+    try {
+        // Total products count
+        const totalProducts = await Product.countDocuments();
+        
+        // Active products count
+        const activeProducts = await Product.countDocuments({ status: 'active' });
+        
+        // Out of stock products
+        const outOfStockProducts = await Product.countDocuments({ 
+            status: 'out_of_stock' 
+        });
+        
+        // Products with low stock (less than 10)
+        const lowStockProducts = await Product.countDocuments({ 
+            quantityInStock: { $lt: 10 },
+            status: 'active'
+        });
+        
+        // Total stock value
+        const stockValue = await Product.aggregate([
+            {
+                $match: { status: 'active' }
+            },
+            {
+                $group: {
+                    _id: null,
+                    totalValue: { 
+                        $sum: { 
+                            $multiply: ['$price', '$quantityInStock'] 
+                        } 
+                    },
+                    totalStock: { $sum: '$quantityInStock' },
+                    avgPrice: { $avg: '$price' }
+                }
+            }
+        ]);
+        
+        // Unique vendors with products
+        const uniqueVendors = await Product.distinct('vendor');
+        
+        // Products added today
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const productsAddedToday = await Product.countDocuments({ 
+            createdAt: { $gte: today } 
+        });
+        
+        // Products added this week
+        const weekAgo = new Date();
+        weekAgo.setDate(weekAgo.getDate() - 7);
+        const productsAddedThisWeek = await Product.countDocuments({ 
+            createdAt: { $gte: weekAgo } 
+        });
+        
+        // Recent vendors (vendors who added products in last 7 days)
+        const recentVendors = await Product.distinct('vendor', {
+            createdAt: { $gte: weekAgo }
+        });
+        
+        res.status(200).json({
+            success: true,
+            data: {
+                totalProducts,
+                activeProducts,
+                outOfStockProducts,
+                lowStockProducts,
+                totalValue: stockValue[0]?.totalValue || 0,
+                totalStock: stockValue[0]?.totalStock || 0,
+                avgPrice: stockValue[0]?.avgPrice || 0,
+                totalVendors: uniqueVendors.length,
+                productsAddedToday,
+                productsAddedThisWeek,
+                recentVendorsWithProducts: recentVendors.length
+            }
+        });
+    } catch (error) {
+        console.error('Error in getAdminProductStats:', error);
+        next(error);
+    }
+};

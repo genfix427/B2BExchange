@@ -990,114 +990,420 @@ const AdminDashboardPage = () => {
       )}
 
       {/* Products Tab */}
+            {/* Products Tab */}
       {!isLoading && activeTab === 'products' && (
         <div className="space-y-6">
-          {/* Product Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Product Stats - Complete Section */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Total Products */}
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Stock Value</p>
+                  <p className="text-sm font-medium text-gray-600">Total Products</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatPrice(productStats.totalValue || 0)}
+                    {formatNumber(productStats.totalProducts || 0)}
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Total inventory value
-                  </p>
+                  <div className="mt-2 text-sm text-gray-500 flex items-center">
+                    <span className="text-green-600 flex items-center">
+                      <TrendingUp className="w-3 h-3 mr-1" />
+                      {productStats.productsAddedThisMonth || 0} this month
+                    </span>
+                  </div>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-lg">
-                  <DollarSign className="w-8 h-8 text-blue-600" />
+                  <Package className="w-8 h-8 text-blue-600" />
                 </div>
               </div>
             </div>
 
+            {/* Total Vendors Added Products */}
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600">Avg Price</p>
+                  <p className="text-sm font-medium text-gray-600">Active Product Vendors</p>
                   <p className="text-2xl font-bold text-gray-900">
-                    {formatPrice(productStats.avgPrice || 0)}
+                    {formatNumber(productStats.vendorsWithProducts || 0)}
                   </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Per product
-                  </p>
-                </div>
-                <div className="p-3 bg-green-100 rounded-lg">
-                  <TrendingUp className="w-8 h-8 text-green-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Low Stock</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {productStats.lowStockProducts || 0}
-                  </p>
-                  <p className="text-sm text-yellow-600 mt-1">
-                    Below threshold
-                  </p>
-                </div>
-                <div className="p-3 bg-yellow-100 rounded-lg">
-                  <AlertCircle className="w-8 h-8 text-yellow-600" />
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">Total Stock</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {formatNumber(productStats.totalStock || 0)}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Units available
-                  </p>
+                  <div className="mt-2 text-sm text-gray-500">
+                    <span className="text-gray-600">
+                      {productStats.totalVendors || 0} total vendors
+                    </span>
+                  </div>
                 </div>
                 <div className="p-3 bg-purple-100 rounded-lg">
-                  <Package className="w-8 h-8 text-purple-600" />
+                  <Building2 className="w-8 h-8 text-purple-600" />
+                </div>
+              </div>
+            </div>
+
+            {/* Total Out of Stock Products */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Out of Stock</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatNumber(productStats.outOfStockProducts || 0)}
+                  </p>
+                  <div className="mt-2 text-sm">
+                    <span className="text-red-600 flex items-center">
+                      <AlertCircle className="w-3 h-3 mr-1" />
+                      {productStats.outOfStockProducts > 0 ? 'Needs attention' : 'All good'}
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-red-100 rounded-lg">
+                  <AlertCircle className="w-8 h-8 text-red-600" />
+                </div>
+              </div>
+            </div>
+
+            {/* Total Products Successfully Sold */}
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Products Sold</p>
+                  <p className="text-2xl font-bold text-gray-900">
+                    {formatNumber(productStats.productsSold || productStats.totalItemsSold || 0)}
+                  </p>
+                  <div className="mt-2 text-sm">
+                    <span className="text-green-600 flex items-center">
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      {formatPrice(productStats.totalSalesValue || productStats.totalRevenue || 0)} revenue
+                    </span>
+                  </div>
+                </div>
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <CheckCircle className="w-8 h-8 text-green-600" />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Product Distribution Chart */}
-          <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Status Distribution</h3>
-            <div className="h-64">
-              {productStats.totalProducts > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={[
-                        { name: 'Active', value: productStats.activeProducts || 0 },
-                        { name: 'Inactive', value: productStats.inactiveProducts || 0 },
-                        { name: 'Out of Stock', value: productStats.outOfStockProducts || 0 },
-                        { name: 'Low Stock', value: productStats.lowStockProducts || 0 }
-                      ]}
-                      cx="50%"
-                      cy="50%"
-                      labelLine={false}
-                      label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
-                      outerRadius={80}
-                      fill="#8884d8"
-                      dataKey="value"
+          {/* Additional Product Metrics */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* Average Price */}
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Avg Product Price</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatPrice(productStats.avgPrice || 0)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Across all products
+                  </p>
+                </div>
+                <div className="p-2 bg-blue-50 rounded-lg">
+                  <DollarSign className="w-6 h-6 text-blue-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Low Stock Products */}
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Low Stock</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatNumber(productStats.lowStockProducts || 0)}
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-1">
+                    Below safety stock
+                  </p>
+                </div>
+                <div className="p-2 bg-yellow-50 rounded-lg">
+                  <AlertCircle className="w-6 h-6 text-yellow-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Total Stock Value */}
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Stock Value</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {formatPrice(productStats.totalValue || 0)}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Total inventory value
+                  </p>
+                </div>
+                <div className="p-2 bg-green-50 rounded-lg">
+                  <TrendingUp className="w-6 h-6 text-green-500" />
+                </div>
+              </div>
+            </div>
+
+            {/* Product Categories */}
+            <div className="bg-white rounded-lg shadow p-5">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600">Categories</p>
+                  <p className="text-xl font-bold text-gray-900">
+                    {productStats.totalCategories || 0}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    Unique categories
+                  </p>
+                </div>
+                <div className="p-2 bg-purple-50 rounded-lg">
+                  <Package className="w-6 h-6 text-purple-500" />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Charts and Top Products */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Product Status Distribution */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Product Status Distribution</h3>
+              <div className="h-64">
+                {productStats.totalProducts > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={[
+                          { name: 'Active', value: productStats.activeProducts || 0 },
+                          { name: 'Inactive', value: productStats.inactiveProducts || 0 },
+                          { name: 'Out of Stock', value: productStats.outOfStockProducts || 0 },
+                          { name: 'Low Stock', value: productStats.lowStockProducts || 0 }
+                        ]}
+                        cx="50%"
+                        cy="50%"
+                        labelLine={false}
+                        label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                        outerRadius={80}
+                        fill="#8884d8"
+                        dataKey="value"
+                      >
+                        <Cell fill="#10B981" />
+                        <Cell fill="#6B7280" />
+                        <Cell fill="#EF4444" />
+                        <Cell fill="#F59E0B" />
+                      </Pie>
+                      <Tooltip formatter={(value) => [value, 'Products']} />
+                      <Legend />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No product data available</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Top Selling Products Chart */}
+            <div className="bg-white shadow rounded-lg p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold text-gray-900">Top Selling Products</h3>
+                <span className="text-sm text-gray-500">Last 30 days</span>
+              </div>
+              <div className="h-64">
+                {productStats.topSellingProducts && productStats.topSellingProducts.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <ReBarChart 
+                      data={productStats.topSellingProducts.slice(0, 5).map(product => ({
+                        name: product.productName?.length > 20 
+                          ? product.productName.substring(0, 20) + '...' 
+                          : product.productName || 'Unknown',
+                        sold: product.totalSold || 0,
+                        revenue: product.totalRevenue || 0
+                      }))}
                     >
-                      <Cell fill="#10B981" />
-                      <Cell fill="#6B7280" />
-                      <Cell fill="#EF4444" />
-                      <Cell fill="#F59E0B" />
-                    </Pie>
-                    <Tooltip formatter={(value) => [value, 'Products']} />
-                  </PieChart>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                      <YAxis />
+                      <Tooltip 
+                        formatter={(value, name) => {
+                          if (name === 'revenue') return [formatPrice(value), 'Revenue'];
+                          return [value, 'Units Sold'];
+                        }}
+                      />
+                      <Legend />
+                      <Bar dataKey="sold" fill="#8884d8" name="Units Sold" radius={[4, 4, 0, 0]} />
+                      <Bar dataKey="revenue" fill="#82ca9d" name="Revenue" radius={[4, 4, 0, 0]} />
+                    </ReBarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-full">
+                    <div className="text-center">
+                      <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-gray-500">No sales data available</p>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Top Selling Products Table */}
+          <div className="bg-white shadow rounded-lg overflow-hidden">
+            <div className="px-6 py-4 border-b border-gray-200">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Top Performing Products</h3>
+                  <p className="text-sm text-gray-600 mt-1">Highest selling products by revenue</p>
+                </div>
+                <Link
+                  to="/admin/products"
+                  className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-blue-600 bg-blue-50 hover:bg-blue-100"
+                >
+                  View All Products
+                  <ArrowRight className="w-4 h-4 ml-2" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Product
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Vendor
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Category
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Stock
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Sold
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Revenue
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {productStats.topSellingProducts && productStats.topSellingProducts.length > 0 ? (
+                    productStats.topSellingProducts.slice(0, 5).map((product, index) => (
+                      <tr key={product._id || index} className="hover:bg-gray-50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center">
+                            {product.image?.url ? (
+                              <img
+                                src={product.image.url}
+                                alt={product.productName}
+                                className="h-10 w-10 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="h-10 w-10 bg-gray-100 rounded flex items-center justify-center">
+                                <Package className="h-5 w-5 text-gray-400" />
+                              </div>
+                            )}
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-gray-900">
+                                {product.productName || 'N/A'}
+                              </div>
+                              <div className="text-sm text-gray-500">
+                                {product.ndcNumber || 'N/A'}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {product.vendorName || 'Unknown'}
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            {product.vendorId || ''}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {product.category || 'Uncategorized'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm text-gray-900">
+                            {formatNumber(product.quantityInStock || 0)} units
+                          </div>
+                          {product.quantityInStock <= (product.lowStockThreshold || 10) && (
+                            <div className="text-xs text-red-600">
+                              Low stock
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {formatNumber(product.totalSold || 0)}
+                          </div>
+                          {product.totalSold > 0 && (
+                            <div className="text-xs text-green-600">
+                              {Math.round(product.totalSold / 30)}/day
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-6 py-4">
+                          <div className="text-sm font-medium text-green-600">
+                            {formatPrice(product.totalRevenue || 0)}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {formatPrice(product.avgPrice || 0)} avg
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-8 text-center">
+                        <Package className="mx-auto h-12 w-12 text-gray-400" />
+                        <h3 className="mt-2 text-sm font-medium text-gray-900">No top selling products</h3>
+                        <p className="mt-1 text-sm text-gray-500">
+                          Sales data will appear here when products are sold
+                        </p>
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Vendor Product Distribution */}
+          <div className="bg-white shadow rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Products by Vendor</h3>
+            <div className="h-64">
+              {productStats.vendorsWithProducts > 0 && productStats.vendorProductCounts ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <ReBarChart 
+                    data={productStats.vendorProductCounts.slice(0, 8).map(vendor => ({
+                      name: vendor.vendorName?.length > 15 
+                        ? vendor.vendorName.substring(0, 15) + '...' 
+                        : vendor.vendorName || 'Unknown',
+                      products: vendor.productCount || 0,
+                      active: vendor.activeProducts || 0
+                    }))}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" angle={-45} textAnchor="end" height={60} />
+                    <YAxis />
+                    <Tooltip 
+                      formatter={(value, name) => {
+                        if (name === 'products') return [value, 'Total Products'];
+                        return [value, 'Active Products'];
+                      }}
+                    />
+                    <Legend />
+                    <Bar dataKey="products" fill="#8884d8" name="Total Products" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="active" fill="#82ca9d" name="Active Products" radius={[4, 4, 0, 0]} />
+                  </ReBarChart>
                 </ResponsiveContainer>
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center">
-                    <Package className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-500">No product data available</p>
+                    <Building2 className="w-12 h-12 text-gray-400 mx-auto mb-2" />
+                    <p className="text-gray-500">No vendor product data available</p>
                   </div>
                 </div>
               )}
@@ -1133,7 +1439,7 @@ const AdminDashboardPage = () => {
               <Users className="w-4 h-4 text-gray-400" />
             </Link>
             <Link
-              to="/admin/reports"
+              to="/admin/analytics"
               className="flex items-center justify-between p-3 border border-gray-300 rounded-md hover:bg-gray-50"
             >
               <span className="text-sm font-medium text-gray-700">View Reports</span>

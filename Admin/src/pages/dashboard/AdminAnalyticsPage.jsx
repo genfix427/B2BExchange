@@ -51,7 +51,6 @@ import {
   fetchTopVendors,
   exportOrders
 } from '../../store/slices/orderSlice';
-import { fetchVendorStats } from '../../store/slices/vendorSlice';
 
 const AdminAnalyticsPage = () => {
   const dispatch = useDispatch();
@@ -61,7 +60,6 @@ const AdminAnalyticsPage = () => {
     topVendors,
     exportLoading 
   } = useSelector((state) => state.orders);
-  const { vendorStats } = useSelector((state) => state.vendors);
 
   const [period, setPeriod] = useState('month');
   const [dateRange, setDateRange] = useState({
@@ -85,8 +83,7 @@ const AdminAnalyticsPage = () => {
           dateFrom: dateRange.start,
           dateTo: dateRange.end
         })),
-        dispatch(fetchTopVendors(10)),
-        dispatch(fetchVendorStats())
+        dispatch(fetchTopVendors(10))
       ]);
     } catch (error) {
       console.error('Error loading analytics data:', error);
@@ -145,7 +142,7 @@ const AdminAnalyticsPage = () => {
       };
     }
     
-    const { summary, rankings } = dashboardStats.data;
+    const { summary } = dashboardStats.data;
     const lifetime = summary?.lifetime || {};
     const monthly = summary?.monthly || {};
     
@@ -170,7 +167,7 @@ const AdminAnalyticsPage = () => {
 
   const analyticsStats = calculateAnalyticsStats();
 
-  // Prepare data for charts
+  // Prepare data for charts - UPDATED TO USE CORRECT BACKEND DATA
   const prepareChartData = () => {
     if (!dashboardStats.data || !analytics.data) {
       return { 
@@ -182,22 +179,21 @@ const AdminAnalyticsPage = () => {
       };
     }
     
-    // Revenue trend data
+    // Revenue trend data - using analytics.data
     const revenueTrend = analytics.data?.analytics?.map(item => ({
       date: item.date,
       revenue: item.revenue || 0,
       orders: item.orders || 0
     })) || [];
     
-    // Top vendors data
-    const topVendorsData = dashboardStats.data.rankings?.topSellingVendors?.slice(0, 8).map(vendor => ({
-      name: vendor.vendorName?.length > 15 
-        ? vendor.vendorName.substring(0, 15) + '...' 
-        : vendor.vendorName || 'Unknown',
+    // Top vendors data - using dashboardStats.data.rankings.topSellingVendors
+    const topVendorsData = dashboardStats.data.rankings?.topSellingVendors?.map(vendor => ({
+      id: vendor._id,
+      name: vendor.vendorName || 'Unknown Vendor',
       sales: vendor.totalSales || 0,
       orders: vendor.orderCount || 0,
       items: vendor.itemCount || 0,
-      avgSale: vendor.avgSaleValue || 0
+      avgSale: vendor.avgSaleValue || (vendor.totalSales / vendor.orderCount) || 0
     })) || [];
     
     // Order status distribution
@@ -207,12 +203,12 @@ const AdminAnalyticsPage = () => {
       revenue: item.revenue || 0
     })) || [];
     
-    // Vendor performance scatter data
-    const vendorPerformance = dashboardStats.data.rankings?.topSellingVendors?.slice(0, 15).map(vendor => ({
-      x: vendor.orderCount || 0,
-      y: vendor.totalSales || 0,
-      z: vendor.itemCount || 0,
-      name: vendor.vendorName
+    // Vendor performance scatter data - using topVendorsData
+    const vendorPerformance = topVendorsData.map(vendor => ({
+      x: vendor.orders,
+      y: vendor.sales,
+      z: vendor.items,
+      name: vendor.name
     })) || [];
     
     return { revenueTrend, topVendorsData, orderDistribution, vendorPerformance };
@@ -515,12 +511,12 @@ const AdminAnalyticsPage = () => {
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-semibold text-gray-900">Top Vendors by Sales</h3>
-                <span className="text-sm text-gray-500">Top 8 performers</span>
+                <span className="text-sm text-gray-500">Top performers</span>
               </div>
               <div className="h-80">
                 {chartData.topVendorsData.length > 0 ? (
                   <ResponsiveContainer width="100%" height="100%">
-                    <ReBarChart data={chartData.topVendorsData}>
+                    <ReBarChart data={chartData.topVendorsData.slice(0, 8)}>
                       <CartesianGrid strokeDasharray="3 3" />
                       <XAxis 
                         dataKey="name" 
@@ -671,29 +667,32 @@ const AdminAnalyticsPage = () => {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Rank
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Vendor
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sales Performance
+                      Total Sales
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Order Metrics
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Average Sale
+                      Orders
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Items Sold
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Performance Score
+                      Avg Sale Value
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Market Share
                     </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {chartData.topVendorsData.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-6 py-8 text-center">
+                      <td colSpan="7" className="px-6 py-8 text-center">
                         <Building2 className="mx-auto h-12 w-12 text-gray-400" />
                         <h3 className="mt-2 text-sm font-medium text-gray-900">No vendor data available</h3>
                         <p className="mt-1 text-sm text-gray-500">
@@ -703,51 +702,73 @@ const AdminAnalyticsPage = () => {
                     </tr>
                   ) : (
                     chartData.topVendorsData.map((vendor, index) => {
-                      const performanceScore = ((vendor.sales / analyticsStats.totalRevenue) * 100).toFixed(1);
+                      // Calculate market share percentage
+                      const marketShare = analyticsStats.totalRevenue > 0 
+                        ? (vendor.sales / analyticsStats.totalRevenue * 100).toFixed(2)
+                        : 0;
                       
                       return (
-                        <tr key={index} className="hover:bg-gray-50">
+                        <tr key={vendor.id || index} className="hover:bg-gray-50">
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                                <Building2 className="h-5 w-5 text-blue-600" />
-                              </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {vendor.name}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  Rank: #{index + 1}
-                                </div>
+                              <div className={`flex-shrink-0 h-8 w-8 rounded-full flex items-center justify-center ${
+                                index === 0 ? 'bg-yellow-100' :
+                                index === 1 ? 'bg-gray-100' :
+                                index === 2 ? 'bg-orange-100' :
+                                'bg-blue-50'
+                              }`}>
+                                <span className={`text-sm font-bold ${
+                                  index === 0 ? 'text-yellow-800' :
+                                  index === 1 ? 'text-gray-800' :
+                                  index === 2 ? 'text-orange-800' :
+                                  'text-blue-800'
+                                }`}>
+                                  #{index + 1}
+                                </span>
                               </div>
                             </div>
                           </td>
 
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {vendor.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ID: {vendor.id?.slice(-6) || 'N/A'}
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-bold text-gray-900">
                               {formatCurrency(vendor.sales)}
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2 mt-1">
                               <div 
                                 className="bg-green-500 h-2 rounded-full" 
-                                style={{ width: `${Math.min((vendor.sales / analyticsStats.totalRevenue) * 100, 100)}%` }}
+                                style={{ width: `${Math.min(marketShare, 100)}%` }}
                               ></div>
                             </div>
-                            <div className="text-xs text-gray-500 mt-1">
-                              {((vendor.sales / analyticsStats.totalRevenue) * 100).toFixed(1)}% of total
-                            </div>
                           </td>
 
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {formatNumber(vendor.orders)} orders
+                              {formatNumber(vendor.orders)}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {vendor.orders > 0 ? (vendor.sales / vendor.orders).toFixed(2) : 0} orders/day
+                              Products
                             </div>
                           </td>
 
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {formatNumber(vendor.items)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              units
+                            </div>
+                          </td>
+
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-green-600">
                               {formatCurrency(vendor.avgSale)}
                             </div>
@@ -756,29 +777,19 @@ const AdminAnalyticsPage = () => {
                             </div>
                           </td>
 
-                          <td className="px-6 py-4">
-                            <div className="text-sm text-gray-900">
-                              {formatNumber(vendor.items)}
-                            </div>
-                            <div className="text-xs text-gray-500">
-                              units sold
-                            </div>
-                          </td>
-
-                          <td className="px-6 py-4">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center">
                               <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
-                                parseFloat(performanceScore) > 15 
+                                parseFloat(marketShare) > 10 
                                   ? 'bg-green-100 text-green-800'
-                                  : parseFloat(performanceScore) > 5
+                                  : parseFloat(marketShare) > 5
                                   ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
+                                  : 'bg-blue-100 text-blue-800'
                               }`}>
-                                {performanceScore}%
+                                {marketShare}%
                               </div>
                               <div className="ml-2 text-xs text-gray-500">
-                                {parseFloat(performanceScore) > 15 ? 'Excellent' : 
-                                 parseFloat(performanceScore) > 5 ? 'Good' : 'Needs Improvement'}
+                                of total
                               </div>
                             </div>
                           </td>
@@ -799,7 +810,7 @@ const AdminAnalyticsPage = () => {
                   <Percent className="w-6 h-6 text-blue-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Market Share Distribution</p>
+                  <p className="text-sm font-medium text-gray-600">Top Vendor Market Share</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {chartData.topVendorsData.length > 0 
                       ? `${((chartData.topVendorsData[0]?.sales || 0) / analyticsStats.totalRevenue * 100).toFixed(1)}%`
@@ -807,7 +818,7 @@ const AdminAnalyticsPage = () => {
                     }
                   </p>
                   <p className="text-xs text-gray-500">
-                    Top vendor market share
+                    {chartData.topVendorsData[0]?.name || 'No vendor data'}
                   </p>
                 </div>
               </div>
@@ -819,7 +830,7 @@ const AdminAnalyticsPage = () => {
                   <TrendingUp className="w-6 h-6 text-green-600" />
                 </div>
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Growth Rate</p>
+                  <p className="text-sm font-medium text-gray-600">Platform Growth</p>
                   <p className="text-2xl font-bold text-gray-900">
                     {analyticsStats.revenueGrowth}%
                   </p>

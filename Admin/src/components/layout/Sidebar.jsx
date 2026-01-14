@@ -10,6 +10,7 @@ import {
   Settings, 
   LogOut,
   ShoppingCart,
+  Package,
   Building2
 } from 'lucide-react'
 
@@ -28,6 +29,7 @@ const navItems = [
   { to: 'vendors', icon: Users, label: 'Vendor Management' },
   { to: 'analytics', icon: BarChart3, label: 'Analytics' },
   { to: 'orders', icon: ShoppingCart, label: 'Orders' },
+  { to: 'products', icon: Package, label: 'Products' },
   { to: 'settings', icon: Settings, label: 'Settings' },
 ]
   

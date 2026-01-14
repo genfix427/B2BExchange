@@ -10,12 +10,13 @@ import {
   Settings,
   Menu,
   X,
-  Bell,
+  Package,
   ChevronDown,
   LogOut,
   ShoppingCart,
   User
 } from 'lucide-react'
+import Header from './Header'
 
 const DashboardLayout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false)
@@ -36,6 +37,7 @@ const DashboardLayout = () => {
     { name: 'Vendor Management', href: '/admin/vendors', icon: Users },
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
+    { name: 'Products', href: '/admin/products', icon: Package },
     { name: 'Settings', href: '/admin/settings', icon: Settings }
   ]
 
@@ -126,10 +128,7 @@ const DashboardLayout = () => {
           <div className="flex-1 px-4 flex justify-between">
             <div className="flex-1 flex"></div>
             <div className="ml-4 flex items-center md:ml-6">
-              <button className="bg-white p-1 rounded-full text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                <span className="sr-only">View notifications</span>
-                <Bell className="h-6 w-6" />
-              </button>
+              <Header />
 
               {/* Profile dropdown */}
               <div className="ml-3 relative">

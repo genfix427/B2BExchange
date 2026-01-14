@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useDispatch } from 'react-redux';
 import {
   X,
@@ -18,7 +18,10 @@ import {
   Phone,
   Edit,
   Save,
-  Eye
+  Eye,
+  ExternalLink,
+  RefreshCw,
+  CheckSquare
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { updateOrderStatus, generateInvoice } from '../../store/slices/orderSlice';
@@ -26,11 +29,25 @@ import { updateOrderStatus, generateInvoice } from '../../store/slices/orderSlic
 const OrderDetailsModal = ({ order, isOpen, onClose }) => {
   const dispatch = useDispatch();
   const [isEditingStatus, setIsEditingStatus] = useState(false);
+  const [isEditingVendorStatus, setIsEditingVendorStatus] = useState({});
   const [newStatus, setNewStatus] = useState(order?.status || '');
-  const [trackingInfo, setTrackingInfo] = useState({
-    trackingNumber: order?.trackingNumber || '',
-    carrier: order?.carrier || ''
-  });
+  const [vendorTrackingInfo, setVendorTrackingInfo] = useState({});
+
+  // Initialize vendor tracking info from order data
+  useEffect(() => {
+    if (order?.vendorOrders) {
+      const initialVendorInfo = {};
+      order.vendorOrders.forEach(vendorOrder => {
+        initialVendorInfo[vendorOrder.vendor?._id || vendorOrder.vendor] = {
+          status: vendorOrder.status || 'pending',
+          trackingNumber: vendorOrder.trackingNumber || '',
+          carrier: vendorOrder.carrier || '',
+          note: ''
+        };
+      });
+      setVendorTrackingInfo(initialVendorInfo);
+    }
+  }, [order]);
 
   if (!isOpen || !order) return null;
 
@@ -100,8 +117,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose }) => {
       orderId: order._id,
       data: {
         status: newStatus,
-        trackingNumber: trackingInfo.trackingNumber,
-        carrier: trackingInfo.carrier,
         note: 'Status updated by admin'
       }
     })).then(() => {
@@ -109,8 +124,71 @@ const OrderDetailsModal = ({ order, isOpen, onClose }) => {
     });
   };
 
+  const handleUpdateVendorStatus = (vendorId) => {
+    const vendorInfo = vendorTrackingInfo[vendorId];
+    if (!vendorInfo) return;
+
+    dispatch(updateOrderStatus({
+      orderId: order._id,
+      vendorId: vendorId,
+      data: {
+        status: vendorInfo.status,
+        trackingNumber: vendorInfo.trackingNumber,
+        carrier: vendorInfo.carrier,
+        note: vendorInfo.note || 'Status updated by admin'
+      }
+    })).then(() => {
+      setIsEditingVendorStatus(prev => ({ ...prev, [vendorId]: false }));
+    });
+  };
+
   const handleDownloadInvoice = () => {
     dispatch(generateInvoice(order._id));
+  };
+
+  const handleVendorTrackingChange = (vendorId, field, value) => {
+    setVendorTrackingInfo(prev => ({
+      ...prev,
+      [vendorId]: {
+        ...prev[vendorId],
+        [field]: value
+      }
+    }));
+  };
+
+  const getVendorItems = (vendorId) => {
+    return order.items?.filter(item => 
+      item.vendor?._id === vendorId || item.vendor?.toString() === vendorId?.toString()
+    ) || [];
+  };
+
+  const getVendorTotal = (vendorId) => {
+    const vendorItems = getVendorItems(vendorId);
+    return vendorItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+  };
+
+  const getVendorOrder = (vendorId) => {
+    return order.vendorOrders?.find(vo => 
+      vo.vendor?._id === vendorId || vo.vendor?.toString() === vendorId?.toString()
+    );
+  };
+
+  const getTrackingLink = (trackingNumber, carrier) => {
+    if (!trackingNumber) return '#';
+    
+    const normalizedCarrier = (carrier || '').toLowerCase();
+    
+    if (normalizedCarrier.includes('ups')) {
+      return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+    } else if (normalizedCarrier.includes('fedex') || normalizedCarrier.includes('fedex')) {
+      return `https://www.fedex.com/fedextrack/?tracknumbers=${trackingNumber}`;
+    } else if (normalizedCarrier.includes('usps')) {
+      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+    } else if (normalizedCarrier.includes('dhl')) {
+      return `https://www.dhl.com/en/express/tracking.html?AWB=${trackingNumber}`;
+    }
+    
+    return `#`;
   };
 
   return (
@@ -208,107 +286,256 @@ const OrderDetailsModal = ({ order, isOpen, onClose }) => {
                       </p>
                     </div>
                   </div>
+                  {isEditingStatus && (
+                    <div className="mt-4 flex space-x-3">
+                      <button
+                        onClick={handleUpdateStatus}
+                        className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                      >
+                        <Save className="w-4 h-4 mr-2" />
+                        Update Status
+                      </button>
+                      <button
+                        onClick={() => setIsEditingStatus(false)}
+                        className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  )}
                 </div>
 
-                {/* Items */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                    <Package className="w-5 h-5 mr-2 text-blue-600" />
-                    Order Items ({order.items?.length || 0})
-                  </h3>
-                  <div className="space-y-4">
-                    {order.items?.map((item, index) => (
-                      <div key={index} className="border-b border-gray-100 pb-4 last:border-0 last:pb-0">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-start">
-                            {item.image?.url ? (
-                              <img
-                                src={item.image.url}
-                                alt={item.productName}
-                                className="h-16 w-16 object-cover rounded-lg mr-4"
-                              />
-                            ) : (
-                              <div className="h-16 w-16 bg-gray-100 rounded-lg flex items-center justify-center mr-4">
-                                <Package className="h-8 w-8 text-gray-400" />
-                              </div>
-                            )}
-                            <div>
-                              <h4 className="text-sm font-medium text-gray-900">{item.productName}</h4>
-                              <p className="text-xs text-gray-500 mt-1">
-                                NDC: {item.ndcNumber} • {item.strength} • {item.dosageForm}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                Manufacturer: {item.manufacturer}
-                              </p>
-                              <div className="mt-2 flex items-center text-xs text-gray-600">
-                                <Building className="w-3 h-3 mr-1" />
-                                Seller: {item.vendorName}
-                              </div>
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm text-gray-600">
-                              {item.quantity} × {formatCurrency(item.unitPrice)}
-                            </p>
-                            <p className="text-lg font-bold text-gray-900">
-                              {formatCurrency(item.totalPrice)}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Vendor Orders */}
+                {/* Vendor Orders with Tracking Details */}
                 {order.vendorOrders && order.vendorOrders.length > 0 && (
                   <div className="bg-white border border-gray-200 rounded-lg p-6">
-                    <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-                      <Building className="w-5 h-5 mr-2 text-blue-600" />
-                      Vendor Orders ({order.vendorOrders.length})
-                    </h3>
-                    <div className="space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                        <Building className="w-5 h-5 mr-2 text-blue-600" />
+                        Vendor Orders & Tracking ({order.vendorOrders.length})
+                      </h3>
+                      {!isEditingStatus && (
+                        <button
+                          onClick={() => setIsEditingStatus(true)}
+                          className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                        >
+                          <Edit className="w-4 h-4 mr-1" />
+                          Edit Main Status
+                        </button>
+                      )}
+                    </div>
+                    <div className="space-y-6">
                       {order.vendorOrders.map((vendorOrder, index) => {
+                        const vendorId = vendorOrder.vendor?._id || vendorOrder.vendor;
+                        const vendorInfo = vendorTrackingInfo[vendorId];
+                        const vendorItems = getVendorItems(vendorId);
+                        const vendorTotal = getVendorTotal(vendorId);
                         const VendorStatusIcon = getStatusIcon(vendorOrder.status);
+                        const isEditing = isEditingVendorStatus[vendorId];
+                        
                         return (
-                          <div key={index} className="border border-gray-200 rounded-lg p-4">
-                            <div className="flex justify-between items-center mb-3">
-                              <div>
-                                <h4 className="text-sm font-medium text-gray-900">
-                                  {vendorOrder.vendorName}
-                                </h4>
-                                <p className="text-xs text-gray-500">
-                                  Status: {vendorOrder.status}
-                                </p>
+                          <div key={index} className="border border-gray-200 rounded-lg overflow-hidden">
+                            {/* Vendor Header */}
+                            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h4 className="text-sm font-medium text-gray-900">
+                                    {vendorOrder.vendorName}
+                                  </h4>
+                                  <p className="text-xs text-gray-500">
+                                    Vendor ID: {vendorId?.slice(-6) || 'N/A'}
+                                  </p>
+                                </div>
+                                <div className="flex items-center space-x-3">
+                                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(vendorOrder.status)}`}>
+                                    <VendorStatusIcon className="w-3 h-3 mr-1" />
+                                    {vendorOrder.status}
+                                  </span>
+                                  {!isEditing && (
+                                    <button
+                                      onClick={() => setIsEditingVendorStatus(prev => ({ ...prev, [vendorId]: true }))}
+                                      className="inline-flex items-center px-2 py-1 border border-gray-300 rounded text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                    >
+                                      <Edit className="w-3 h-3 mr-1" />
+                                      Edit
+                                    </button>
+                                  )}
+                                </div>
                               </div>
-                              <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(vendorOrder.status)}`}>
-                                <VendorStatusIcon className="w-3 h-3 mr-1" />
-                                {vendorOrder.status}
-                              </span>
                             </div>
-                            {vendorOrder.trackingNumber && (
-                              <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <p className="text-sm text-gray-600">Tracking Number</p>
-                                    <p className="text-sm font-medium text-gray-900">
-                                      {vendorOrder.trackingNumber}
-                                    </p>
-                                  </div>
-                                  <div>
-                                    <p className="text-sm text-gray-600">Carrier</p>
-                                    <p className="text-sm font-medium text-gray-900">
-                                      {vendorOrder.carrier || 'N/A'}
-                                    </p>
+
+                            <div className="p-4">
+                              {/* Vendor Items Summary */}
+                              <div className="mb-4">
+                                <p className="text-sm text-gray-600 mb-2">Items from this vendor:</p>
+                                <div className="space-y-2">
+                                  {vendorItems.map((item, itemIndex) => (
+                                    <div key={itemIndex} className="flex justify-between items-center text-sm">
+                                      <span className="text-gray-700">
+                                        {item.quantity} × {item.productName}
+                                      </span>
+                                      <span className="font-medium text-gray-900">
+                                        {formatCurrency(item.totalPrice)}
+                                      </span>
+                                    </div>
+                                  ))}
+                                  <div className="pt-2 border-t border-gray-200">
+                                    <div className="flex justify-between items-center font-medium">
+                                      <span>Vendor Total:</span>
+                                      <span className="text-blue-600">{formatCurrency(vendorTotal)}</span>
+                                    </div>
                                   </div>
                                 </div>
-                                {vendorOrder.shippedAt && (
-                                  <p className="text-xs text-gray-500 mt-2">
-                                    Shipped: {formatDate(vendorOrder.shippedAt)}
-                                  </p>
-                                )}
                               </div>
-                            )}
+
+                              {/* Tracking Information */}
+                              {isEditing ? (
+                                <div className="bg-blue-50 p-4 rounded-lg">
+                                  <h5 className="text-sm font-medium text-gray-900 mb-3">Update Tracking Information</h5>
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Status
+                                      </label>
+                                      <select
+                                        value={vendorInfo?.status || 'pending'}
+                                        onChange={(e) => handleVendorTrackingChange(vendorId, 'status', e.target.value)}
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                      >
+                                        {statusOptions.map((option) => (
+                                          <option key={option.value} value={option.value}>
+                                            {option.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Tracking Number
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={vendorInfo?.trackingNumber || ''}
+                                        onChange={(e) => handleVendorTrackingChange(vendorId, 'trackingNumber', e.target.value)}
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        placeholder="Enter tracking number"
+                                      />
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Carrier
+                                      </label>
+                                      <select
+                                        value={vendorInfo?.carrier || ''}
+                                        onChange={(e) => handleVendorTrackingChange(vendorId, 'carrier', e.target.value)}
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                      >
+                                        {carrierOptions.map((option) => (
+                                          <option key={option.value} value={option.value}>
+                                            {option.label}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    </div>
+                                    <div>
+                                      <label className="block text-xs font-medium text-gray-700 mb-1">
+                                        Notes (Optional)
+                                      </label>
+                                      <input
+                                        type="text"
+                                        value={vendorInfo?.note || ''}
+                                        onChange={(e) => handleVendorTrackingChange(vendorId, 'note', e.target.value)}
+                                        className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+                                        placeholder="Add any notes"
+                                      />
+                                    </div>
+                                    <div className="flex space-x-2 pt-2">
+                                      <button
+                                        onClick={() => handleUpdateVendorStatus(vendorId)}
+                                        className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        <Save className="w-4 h-4 mr-2" />
+                                        Update
+                                      </button>
+                                      <button
+                                        onClick={() => setIsEditingVendorStatus(prev => ({ ...prev, [vendorId]: false }))}
+                                        className="flex-1 inline-flex items-center justify-center px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                                      >
+                                        Cancel
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="bg-gray-50 p-4 rounded-lg">
+                                  <h5 className="text-sm font-medium text-gray-900 mb-3">Tracking Information</h5>
+                                  {vendorOrder.trackingNumber ? (
+                                    <div className="space-y-3">
+                                      <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                          <p className="text-xs text-gray-600">Tracking Number</p>
+                                          <div className="flex items-center mt-1">
+                                            <p className="text-sm font-medium text-gray-900">
+                                              {vendorOrder.trackingNumber}
+                                            </p>
+                                            {vendorOrder.carrier && (
+                                              <a
+                                                href={getTrackingLink(vendorOrder.trackingNumber, vendorOrder.carrier)}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="ml-2 inline-flex items-center text-xs text-blue-600 hover:text-blue-800"
+                                              >
+                                                <ExternalLink className="w-3 h-3 mr-1" />
+                                                Track
+                                              </a>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <p className="text-xs text-gray-600">Carrier</p>
+                                          <p className="text-sm font-medium text-gray-900">
+                                            {vendorOrder.carrier || 'Not specified'}
+                                          </p>
+                                        </div>
+                                      </div>
+                                      {vendorOrder.shippedAt && (
+                                        <div>
+                                          <p className="text-xs text-gray-600">Shipped Date</p>
+                                          <p className="text-sm font-medium text-gray-900">
+                                            {formatDate(vendorOrder.shippedAt)}
+                                          </p>
+                                        </div>
+                                      )}
+                                      {vendorOrder.deliveredAt && (
+                                        <div>
+                                          <p className="text-xs text-gray-600">Delivered Date</p>
+                                          <p className="text-sm font-medium text-gray-900">
+                                            {formatDate(vendorOrder.deliveredAt)}
+                                          </p>
+                                        </div>
+                                      )}
+                                      <div className="pt-3 border-t border-gray-200">
+                                        <p className="text-xs text-gray-600">Last Updated</p>
+                                        <p className="text-xs text-gray-500">
+                                          {vendorOrder.updatedAt ? formatDate(vendorOrder.updatedAt) : 'N/A'}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <p className="text-sm text-gray-500">
+                                      No tracking information provided by vendor yet
+                                    </p>
+                                  )}
+                                  {vendorOrder.updatedBy === 'vendor' && (
+                                    <div className="mt-3 p-2 bg-yellow-50 border border-yellow-100 rounded text-xs text-yellow-800">
+                                      <div className="flex items-center">
+                                        <CheckSquare className="w-3 h-3 mr-1" />
+                                        <span>Updated by vendor</span>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         );
                       })}
@@ -378,110 +605,6 @@ const OrderDetailsModal = ({ order, isOpen, onClose }) => {
                     </div>
                   </div>
                 )}
-
-                {/* Tracking Information */}
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-                      <Truck className="w-5 h-5 mr-2 text-blue-600" />
-                      Tracking Information
-                    </h3>
-                    {!isEditingStatus && (
-                      <button
-                        onClick={() => setIsEditingStatus(true)}
-                        className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                      >
-                        <Edit className="w-4 h-4 mr-1" />
-                        Edit
-                      </button>
-                    )}
-                  </div>
-
-                  {isEditingStatus ? (
-                    <div className="space-y-4">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Tracking Number
-                        </label>
-                        <input
-                          type="text"
-                          value={trackingInfo.trackingNumber}
-                          onChange={(e) => setTrackingInfo(prev => ({ ...prev, trackingNumber: e.target.value }))}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                          placeholder="Enter tracking number"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Carrier
-                        </label>
-                        <select
-                          value={trackingInfo.carrier}
-                          onChange={(e) => setTrackingInfo(prev => ({ ...prev, carrier: e.target.value }))}
-                          className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                        >
-                          {carrierOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="flex space-x-3">
-                        <button
-                          onClick={handleUpdateStatus}
-                          className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-                        >
-                          <Save className="w-4 h-4 mr-2" />
-                          Update Status
-                        </button>
-                        <button
-                          onClick={() => setIsEditingStatus(false)}
-                          className="flex-1 inline-flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      {order.trackingNumber ? (
-                        <>
-                          <div>
-                            <p className="text-sm text-gray-600">Tracking Number</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              {order.trackingNumber}
-                            </p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Carrier</p>
-                            <p className="text-sm font-medium text-gray-900">
-                              {order.carrier || 'Not specified'}
-                            </p>
-                          </div>
-                          {order.shippedAt && (
-                            <div>
-                              <p className="text-sm text-gray-600">Shipped Date</p>
-                              <p className="text-sm font-medium text-gray-900">
-                                {formatDate(order.shippedAt)}
-                              </p>
-                            </div>
-                          )}
-                          {order.deliveredAt && (
-                            <div>
-                              <p className="text-sm text-gray-600">Delivered Date</p>
-                              <p className="text-sm font-medium text-gray-900">
-                                {formatDate(order.deliveredAt)}
-                              </p>
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-sm text-gray-500">No tracking information available</p>
-                      )}
-                    </div>
-                  )}
-                </div>
 
                 {/* Order Totals */}
                 <div className="bg-white border border-gray-200 rounded-lg p-6">

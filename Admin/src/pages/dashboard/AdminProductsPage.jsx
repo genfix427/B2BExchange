@@ -39,7 +39,7 @@ const AdminProductsPage = () => {
     const [filters, setFilters] = useState({
         search: '',
         status: '',
-        category: '',
+        dosageForm: '',
         vendor: '',
         minPrice: '',
         maxPrice: '',
@@ -143,13 +143,16 @@ const AdminProductsPage = () => {
         { value: 'pending', label: 'Pending' }
     ];
 
-    const categoryOptions = [
-        { value: '', label: 'All Categories' },
-        { value: 'prescription', label: 'Prescription' },
-        { value: 'otc', label: 'Over-the-counter' },
-        { value: 'medical_supplies', label: 'Medical Supplies' },
-        { value: 'equipment', label: 'Equipment' },
-        { value: 'vaccines', label: 'Vaccines' }
+    const dosageFormOptions = [
+        { value: '', label: 'All Dosage Forms' },
+        { value: 'Tablet', label: 'Tablet' },
+        { value: 'Capsule', label: 'Capsule' },
+        { value: 'Injection', label: 'Injection' },
+        { value: 'Solution', label: 'Solution' },
+        { value: 'Suspension', label: 'Suspension' },
+        { value: 'Cream', label: 'Cream' },
+        { value: 'Ointment', label: 'Ointment' },
+        { value: 'Other', label: 'Other' }
     ];
 
     return (
@@ -283,11 +286,11 @@ const AdminProductsPage = () => {
                     </select>
 
                     <select
-                        value={filters.category}
-                        onChange={(e) => handleFilterChange('category', e.target.value)}
+                        value={filters.dosageForm}
+                        onChange={(e) => handleFilterChange('dosageForm', e.target.value)}
                         className="block w-full pl-3 pr-10 py-2 text-base border border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md"
                     >
-                        {categoryOptions.map((option) => (
+                        {dosageFormOptions.map((option) => (
                             <option key={option.value} value={option.value}>
                                 {option.label}
                             </option>
@@ -355,7 +358,7 @@ const AdminProductsPage = () => {
                                             Price & Stock
                                         </th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Category
+                                            Dosage Form
                                         </th>
                                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                                             Status
@@ -420,7 +423,7 @@ const AdminProductsPage = () => {
                                                 </td>
                                                 <td className="px-6 py-4">
                                                     <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                                                        {product.category?.replace('_', ' ') || 'Uncategorized'}
+                                                        {product.dosageForm?.replace('_', ' ') || 'No Dosage Form'}
                                                     </span>
                                                 </td>
                                                 <td className="px-6 py-4">

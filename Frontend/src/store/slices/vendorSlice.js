@@ -108,6 +108,12 @@ const initialState = {
   vendorOrders: [],
   currentVendorOrder: null,
   documents: [],
+  pagination: {
+    total: 0,
+    page: 1,
+    limit: 10,
+    pages: 1
+  },
   stats: {
     totalOrders: 0,
     pendingOrders: 0,

@@ -32,14 +32,6 @@ const AdminSettingsPage = () => {
     confirmPassword: ''
   })
 
-  const [notifications, setNotifications] = useState({
-    emailNotifications: true,
-    vendorApprovals: true,
-    systemAlerts: true,
-    marketingEmails: false,
-    weeklyReports: true
-  })
-
   const handleProfileSubmit = (e) => {
     e.preventDefault()
     // Handle profile update
@@ -61,18 +53,9 @@ const AdminSettingsPage = () => {
     })
   }
 
-  const handleNotificationChange = (key) => {
-    setNotifications(prev => ({
-      ...prev,
-      [key]: !prev[key]
-    }))
-  }
-
   const tabs = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'security', label: 'Security', icon: Shield },
-    { id: 'notifications', label: 'Notifications', icon: Bell },
-    { id: 'preferences', label: 'Preferences', icon: Globe }
   ]
 
   return (
@@ -314,169 +297,6 @@ const AdminSettingsPage = () => {
                 </div>
               </div>
             </form>
-          )}
-
-          {/* Notifications Tab */}
-          {activeTab === 'notifications' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">Email Notifications</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Configure how you receive notifications and alerts.
-                </p>
-              </div>
-
-              <div className="space-y-4">
-                {Object.entries(notifications).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50">
-                    <div className="flex items-center">
-                      <Mail className="h-5 w-5 text-gray-400 mr-3" />
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {key.split(/(?=[A-Z])/).join(' ')}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Receive email notifications for {key.toLowerCase().replace(/([A-Z])/g, ' $1')}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => handleNotificationChange(key)}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full ${
-                        value ? 'bg-blue-600' : 'bg-gray-200'
-                      }`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                        value ? 'translate-x-6' : 'translate-x-1'
-                      }`} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <div className="pt-6 border-t border-gray-200">
-                <h4 className="text-lg font-medium text-gray-900 mb-4">Notification Preferences</h4>
-                <div className="space-y-3">
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="instant"
-                      name="notification-frequency"
-                      defaultChecked
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <label htmlFor="instant" className="ml-3 text-sm text-gray-700">
-                      Instant notifications
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="daily"
-                      name="notification-frequency"
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <label htmlFor="daily" className="ml-3 text-sm text-gray-700">
-                      Daily digest
-                    </label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="radio"
-                      id="weekly"
-                      name="notification-frequency"
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                    />
-                    <label htmlFor="weekly" className="ml-3 text-sm text-gray-700">
-                      Weekly summary
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Preferences
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Preferences Tab */}
-          {activeTab === 'preferences' && (
-            <div className="space-y-6">
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">Account Preferences</h3>
-                <p className="mt-1 text-sm text-gray-600">
-                  Customize your account preferences and display settings.
-                </p>
-              </div>
-
-              <div className="space-y-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Time Zone
-                  </label>
-                  <select className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option>(UTC-05:00) Eastern Time</option>
-                    <option>(UTC-06:00) Central Time</option>
-                    <option>(UTC-07:00) Mountain Time</option>
-                    <option>(UTC-08:00) Pacific Time</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Date Format
-                  </label>
-                  <select className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option>MM/DD/YYYY</option>
-                    <option>DD/MM/YYYY</option>
-                    <option>YYYY-MM-DD</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Items Per Page
-                  </label>
-                  <select className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option>10</option>
-                    <option>25</option>
-                    <option>50</option>
-                    <option>100</option>
-                  </select>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Dark Mode</p>
-                    <p className="text-sm text-gray-500">Use dark theme</p>
-                  </div>
-                  <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200">
-                    <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-1" />
-                  </button>
-                </div>
-
-                <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg">
-                  <div>
-                    <p className="text-sm font-medium text-gray-900">Email Summaries</p>
-                    <p className="text-sm text-gray-500">Receive weekly activity reports</p>
-                  </div>
-                  <button className="relative inline-flex h-6 w-11 items-center rounded-full bg-blue-600">
-                    <span className="inline-block h-4 w-4 transform rounded-full bg-white translate-x-6" />
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <button className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700">
-                  <Save className="w-4 h-4 mr-2" />
-                  Save Preferences
-                </button>
-              </div>
-            </div>
           )}
         </div>
       </div>

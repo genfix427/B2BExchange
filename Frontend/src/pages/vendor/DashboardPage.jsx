@@ -51,6 +51,8 @@ const DashboardPage = () => {
     totalOrders: 0,
     pendingOrders: 0,
     completedOrders: 0,
+    processingOrders: 0,
+    shippedOrders: 0,
     totalRevenue: 0,
     avgOrderValue: 0
   });
@@ -68,37 +70,6 @@ const DashboardPage = () => {
           dispatch(fetchVendorOrders({ limit: 5 }))
         ]);
         
-        // Calculate order stats
-        if (vendorOrders && vendorOrders.length > 0) {
-          const total = vendorOrders.length;
-          const pending = vendorOrders.filter(o => o.status === 'pending').length;
-          const completed = vendorOrders.filter(o => ['delivered', 'shipped'].includes(o.status)).length;
-          const revenue = vendorOrders.reduce((sum, order) => sum + (order.total || 0), 0);
-          const avgValue = revenue / total;
-          
-          setOrderStats({
-            totalOrders: total,
-            pendingOrders: pending,
-            completedOrders: completed,
-            totalRevenue: revenue,
-            avgOrderValue: avgValue
-          });
-        }
-        
-        // Generate recent activities
-        generateRecentActivities();
-        
-        // Set vendor stats
-        dispatch(setStats({
-          totalOrders: vendorOrders?.length || 0,
-          pendingOrders: vendorOrders?.filter(o => o.status === 'pending').length || 0,
-          completedOrders: vendorOrders?.filter(o => ['delivered', 'shipped'].includes(o.status)).length || 0,
-          totalRevenue: `$${vendorOrders?.reduce((sum, o) => sum + (o.total || 0), 0)?.toLocaleString() || '0'}`,
-          activeListings: productStats?.activeProducts || 0,
-          conversionRate: '12.5%',
-          monthlyGrowth: '+8.2%',
-          customerRating: '4.8/5.0'
-        }));
       } catch (error) {
         console.error('Error loading dashboard data:', error);
       } finally {
@@ -109,17 +80,59 @@ const DashboardPage = () => {
     loadDashboardData();
   }, [dispatch]);
 
+  // Calculate order stats whenever vendorOrders changes
+  useEffect(() => {
+    if (vendorOrders && vendorOrders.length > 0) {
+      const total = vendorOrders.length;
+      const pending = vendorOrders.filter(o => o.status === 'pending').length;
+      const completed = vendorOrders.filter(o => ['delivered', 'shipped'].includes(o.status)).length;
+      const processing = vendorOrders.filter(o => o.status === 'processing').length;
+      const shipped = vendorOrders.filter(o => o.status === 'shipped').length;
+      const revenue = vendorOrders.reduce((sum, order) => sum + (order.total || 0), 0);
+      const avgValue = total > 0 ? revenue / total : 0;
+      
+      setOrderStats({
+        totalOrders: total,
+        pendingOrders: pending,
+        completedOrders: completed,
+        processingOrders: processing,
+        shippedOrders: shipped,
+        totalRevenue: revenue,
+        avgOrderValue: avgValue
+      });
+      
+      // Set vendor stats
+      dispatch(setStats({
+        totalOrders: total,
+        pendingOrders: pending,
+        completedOrders: completed,
+        totalRevenue: `$${revenue?.toLocaleString() || '0'}`,
+        activeListings: productStats?.activeProducts || 0,
+        conversionRate: '12.5%',
+        monthlyGrowth: '+8.2%',
+        customerRating: '4.8/5.0'
+      }));
+    }
+  }, [vendorOrders, productStats, dispatch]);
+
+  // Generate recent activities whenever data changes
+  useEffect(() => {
+    generateRecentActivities();
+  }, [products, vendorOrders]);
+
   const generateRecentActivities = () => {
     const activities = [];
     
     // Add recent products as activities
-    products.slice(0, 3).forEach(product => {
-      activities.push({
-        type: 'product_added',
-        message: `New product added: ${product.productName}`,
-        createdAt: product.createdAt
+    if (products && products.length > 0) {
+      products.slice(0, 3).forEach(product => {
+        activities.push({
+          type: 'product_added',
+          message: `New product added: ${product.productName}`,
+          createdAt: product.createdAt
+        });
       });
-    });
+    }
     
     // Add recent orders as activities
     if (vendorOrders && vendorOrders.length > 0) {
@@ -412,13 +425,13 @@ const DashboardPage = () => {
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Total Orders</span>
                 <span className="text-sm font-medium text-gray-900">
-                  {orderStats.totalOrders}
+                  {vendorOrders?.length || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Pending</span>
                 <span className="text-sm font-medium text-yellow-600">
-                  {orderStats.pendingOrders}
+                  {vendorOrders?.filter(o => o.status === 'pending').length || 0}
                 </span>
               </div>
               <div className="flex justify-between items-center">

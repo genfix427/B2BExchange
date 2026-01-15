@@ -1307,3 +1307,50 @@ export const updateVendorOrderStatus = async (req, res, next) => {
   }
 };
 
+// @desc    Get order details
+// @route   GET /api/admin/orders/:id
+// @access  Private (Admin)
+export const getOrderDetails = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid order ID format'
+      });
+    }
+
+    const order = await Order.findById(id)
+      .populate('customer', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email phone')
+      .populate('items.vendor', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email')
+      .populate('items.product', 'productName ndcNumber strength dosageForm manufacturer')
+      .populate('vendorOrders.vendor', 'pharmacyInfo.legalBusinessName pharmacyInfo.dba email phone')
+      .lean(); // Use lean() for better performance
+
+    if (!order) {
+      return res.status(404).json({
+        success: false,
+        message: 'Order not found'
+      });
+    }
+
+    // Transform the order data
+    const transformedOrder = {
+      ...order,
+      customerPhone: order.customer?.phone || '',
+      // Ensure arrays exist
+      items: order.items || [],
+      vendorOrders: order.vendorOrders || [],
+      statusHistory: order.statusHistory || []
+    };
+
+    res.status(200).json({
+      success: true,
+      data: transformedOrder
+    });
+  } catch (error) {
+    console.error('Error in getOrderDetails:', error);
+    next(error);
+  }
+};

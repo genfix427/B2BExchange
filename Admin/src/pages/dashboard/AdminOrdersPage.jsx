@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -19,7 +20,10 @@ import {
   CheckCircle,
   XCircle,
   RefreshCw,
-  Clock
+  Clock,
+  ArrowRight,
+  DollarSign,
+  Box
 } from 'lucide-react';
 import { format } from 'date-fns';
 import {
@@ -29,17 +33,16 @@ import {
   exportOrders,
   setOrdersPage
 } from '../../store/slices/orderSlice';
-import OrderDetailsModal from '../../components/OrderDetails/OrderDetailsModal';
 
 const AdminOrdersPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { allOrders } = useSelector((state) => state.orders);
 
-const orders = allOrders;
-const loading = allOrders.loading;
-const error = allOrders.error;
+  const orders = allOrders;
+  const loading = allOrders.loading;
+  const error = allOrders.error;
 
-  
   const [filters, setFilters] = useState({
     status: '',
     type: '',
@@ -57,7 +60,6 @@ const error = allOrders.error;
     trackingNumber: '',
     carrier: ''
   });
-  const [viewOrderDetails, setViewOrderDetails] = useState(null);
 
   // Status options
   const statusOptions = [
@@ -136,6 +138,10 @@ const error = allOrders.error;
     dispatch(exportOrders({ type: filters.type || 'all', filters }));
   };
 
+  const handleViewOrderDetails = (order) => {
+    navigate(`/admin/orders/${order._id}`);
+  };
+
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -173,7 +179,7 @@ const error = allOrders.error;
       pending: Clock,
       confirmed: CheckCircle,
       processing: Package,
-      packed: Package,
+      packed: Box,
       shipped: Truck,
       delivered: CheckCircle,
       cancelled: XCircle
@@ -195,9 +201,30 @@ const error = allOrders.error;
     return type === 'sell' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800';
   };
 
-  const handleViewOrderDetails = (order) => {
-    setViewOrderDetails(order);
+  // Calculate order statistics
+  const calculateOrderStats = () => {
+    if (!orders.data || orders.data.length === 0) {
+      return {
+        total: 0,
+        pending: 0,
+        shipped: 0,
+        delivered: 0,
+        totalRevenue: 0
+      };
+    }
+
+    const stats = {
+      total: orders.data.length,
+      pending: orders.data.filter(o => o.status === 'pending').length,
+      shipped: orders.data.filter(o => o.status === 'shipped' || o.status === 'partially_shipped').length,
+      delivered: orders.data.filter(o => o.status === 'delivered' || o.status === 'partially_delivered').length,
+      totalRevenue: orders.data.reduce((sum, order) => sum + (order.total || 0), 0)
+    };
+
+    return stats;
   };
+
+  const orderStats = calculateOrderStats();
 
   return (
     <div className="space-y-6">
@@ -228,12 +255,12 @@ const error = allOrders.error;
       </div>
 
       {/* Stats Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-600">Total Orders</p>
-              <p className="text-2xl font-bold text-gray-900">{orders.total || 0}</p>
+              <p className="text-2xl font-bold text-gray-900">{orderStats.total}</p>
             </div>
             <div className="p-3 bg-blue-100 rounded-lg">
               <ShoppingBag className="w-8 h-8 text-blue-600" />
@@ -246,7 +273,7 @@ const error = allOrders.error;
             <div>
               <p className="text-sm font-medium text-gray-600">Pending</p>
               <p className="text-2xl font-bold text-gray-900">
-                {orders.data?.filter(o => o.status === 'pending').length || 0}
+                {orderStats.pending}
               </p>
             </div>
             <div className="p-3 bg-yellow-100 rounded-lg">
@@ -260,7 +287,7 @@ const error = allOrders.error;
             <div>
               <p className="text-sm font-medium text-gray-600">Shipped</p>
               <p className="text-2xl font-bold text-gray-900">
-                {orders.data?.filter(o => o.status === 'shipped' || o.status === 'partially_shipped').length || 0}
+                {orderStats.shipped}
               </p>
             </div>
             <div className="p-3 bg-orange-100 rounded-lg">
@@ -274,11 +301,25 @@ const error = allOrders.error;
             <div>
               <p className="text-sm font-medium text-gray-600">Delivered</p>
               <p className="text-2xl font-bold text-gray-900">
-                {orders.data?.filter(o => o.status === 'delivered' || o.status === 'partially_delivered').length || 0}
+                {orderStats.delivered}
               </p>
             </div>
             <div className="p-3 bg-green-100 rounded-lg">
               <CheckCircle className="w-8 h-8 text-green-600" />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600">Total Revenue</p>
+              <p className="text-2xl font-bold text-gray-900">
+                {formatCurrency(orderStats.totalRevenue)}
+              </p>
+            </div>
+            <div className="p-3 bg-emerald-100 rounded-lg">
+              <DollarSign className="w-8 h-8 text-emerald-600" />
             </div>
           </div>
         </div>
@@ -295,7 +336,7 @@ const error = allOrders.error;
               </div>
               <input
                 type="text"
-                placeholder="Search orders..."
+                placeholder="Search by order #, customer, vendor..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
                 className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
@@ -447,7 +488,7 @@ const error = allOrders.error;
                       Customer/Vendor
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Type & Items
+                      Items
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Amount
@@ -500,7 +541,7 @@ const error = allOrders.error;
                           </div>
                         </td>
 
-                        {/* Type & Items */}
+                        {/* Items */}
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getOrderTypeColor(orderType)}`}>
@@ -548,30 +589,19 @@ const error = allOrders.error;
                           <div className="flex items-center space-x-2">
                             <button
                               onClick={() => handleViewOrderDetails(order)}
-                              className="text-blue-600 hover:text-blue-900 p-1"
+                              className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                               title="View Details"
                             >
-                              <Eye className="w-5 h-5" />
+                              <Eye className="w-4 h-4 mr-1" />
+                              View
                             </button>
                             <button
                               onClick={() => dispatch(generateInvoice(order._id))}
-                              className="text-green-600 hover:text-green-900 p-1"
+                              className="inline-flex items-center px-3 py-1.5 text-sm font-medium rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200"
                               title="Download Invoice"
                             >
-                              <Download className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => setStatusUpdateModal({
-                                show: true,
-                                orderId: order._id,
-                                newStatus: order.status,
-                                trackingNumber: order.trackingNumber || '',
-                                carrier: order.carrier || ''
-                              })}
-                              className="text-purple-600 hover:text-purple-900 p-1"
-                              title="Update Status"
-                            >
-                              <MoreVertical className="w-5 h-5" />
+                              <Download className="w-4 h-4 mr-1" />
+                              Invoice
                             </button>
                           </div>
                         </td>
@@ -733,15 +763,6 @@ const error = allOrders.error;
             </div>
           </div>
         </div>
-      )}
-
-      {/* Order Details Modal */}
-      {viewOrderDetails && (
-        <OrderDetailsModal
-          order={viewOrderDetails}
-          isOpen={!!viewOrderDetails}
-          onClose={() => setViewOrderDetails(null)}
-        />
       )}
     </div>
   );

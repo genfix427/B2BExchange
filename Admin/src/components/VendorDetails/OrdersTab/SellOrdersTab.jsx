@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate } from 'react-router-dom';
 import {
   fetchVendorSellOrders,
   updateOrderStatus,
@@ -25,13 +26,15 @@ import {
   ShoppingBag,
   RefreshCw,
   FileText,
-  User
+  User,
+  ExternalLink
 } from 'lucide-react';
 import { format } from 'date-fns';
 import StatusBadge from './StatusBadge';
 
 const SellOrdersTab = ({ vendor }) => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { vendorSellOrders, statusUpdate } = useSelector((state) => state.orders);
   
   const [filters, setFilters] = useState({
@@ -40,7 +43,6 @@ const SellOrdersTab = ({ vendor }) => {
     dateFrom: '',
     dateTo: ''
   });
-  const [selectedOrder, setSelectedOrder] = useState(null);
   const [statusModal, setStatusModal] = useState({
     show: false,
     orderId: null,
@@ -152,6 +154,27 @@ const SellOrdersTab = ({ vendor }) => {
   const formatDateTime = (date) => {
     if (!date) return 'N/A';
     return format(new Date(date), 'MMM d, yyyy h:mm a');
+  };
+
+  const handleViewOrderDetails = (orderId) => {
+    if (orderId) {
+      navigate(`/admin/orders/${orderId}`);
+    }
+  };
+
+  const getTrackingLink = (trackingNumber, carrier) => {
+    if (!trackingNumber) return '#';
+    const normalizedCarrier = (carrier || '').toLowerCase();
+    if (normalizedCarrier.includes('ups')) {
+      return `https://www.ups.com/track?tracknum=${trackingNumber}`;
+    } else if (normalizedCarrier.includes('fedex')) {
+      return `https://www.fedex.com/fedextrack/?tracknumbers=${trackingNumber}`;
+    } else if (normalizedCarrier.includes('usps')) {
+      return `https://tools.usps.com/go/TrackConfirmAction?tLabels=${trackingNumber}`;
+    } else if (normalizedCarrier.includes('dhl')) {
+      return `https://www.dhl.com/en/express/tracking.html?AWB=${trackingNumber}`;
+    }
+    return '#';
   };
 
   // Calculate summary stats
@@ -401,16 +424,28 @@ const SellOrdersTab = ({ vendor }) => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <StatusBadge status={order.status} />
                       {order.trackingNumber && (
-                        <div className="text-xs text-gray-500 mt-1">
-                          Tracking: {order.trackingNumber}
-                          {order.carrier && ` (${order.carrier})`}
+                        <div className="mt-1">
+                          <div className="text-xs text-gray-500">
+                            Tracking: {order.trackingNumber}
+                          </div>
+                          {order.carrier && (
+                            <a
+                              href={getTrackingLink(order.trackingNumber, order.carrier)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center text-xs text-blue-600 hover:text-blue-800"
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              Track on {order.carrier}
+                            </a>
+                          )}
                         </div>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
-                          onClick={() => setSelectedOrder(order)}
+                          onClick={() => handleViewOrderDetails(order._id)}
                           className="text-blue-600 hover:text-blue-900 p-1"
                           title="View Details"
                         >
@@ -431,7 +466,9 @@ const SellOrdersTab = ({ vendor }) => {
                           onClick={() => setStatusModal({
                             show: true,
                             orderId: order._id,
-                            newStatus: order.status || 'pending'
+                            newStatus: order.status || 'pending',
+                            trackingNumber: order.trackingNumber || '',
+                            carrier: order.carrier || ''
                           })}
                           className="text-purple-600 hover:text-purple-900 p-1"
                           title="Update Status"
@@ -600,189 +637,6 @@ const SellOrdersTab = ({ vendor }) => {
                 className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
               >
                 {statusUpdate.loading ? 'Updating...' : 'Update Status'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Order Details Modal */}
-      {selectedOrder && (
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b flex justify-between items-center">
-              <h3 className="text-lg font-medium text-gray-900">Order Details</h3>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="text-gray-400 hover:text-gray-500"
-              >
-                <XCircle className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="px-6 py-4">
-              {/* Order Summary */}
-              <div className="mb-6">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Order Summary</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Order Number</p>
-                    <p className="text-sm font-medium text-gray-900">{selectedOrder.orderNumber || 'N/A'}</p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Date</p>
-                    <p className="text-sm font-medium text-gray-900">
-                      {formatDateTime(selectedOrder.createdAt)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Status</p>
-                    <StatusBadge status={selectedOrder.status} />
-                  </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Payment Status</p>
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      selectedOrder.paymentStatus === 'paid' 
-                        ? 'bg-green-100 text-green-800'
-                        : selectedOrder.paymentStatus === 'pending'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {selectedOrder.paymentStatus || 'pending'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Customer Information */}
-              <div className="mb-6">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">Customer Information</h4>
-                <div className="bg-gray-50 rounded-lg p-4">
-                  <div className="flex items-center mb-2">
-                    <User className="w-4 h-4 text-gray-500 mr-2" />
-                    <p className="text-sm font-medium text-gray-900">{selectedOrder.customerName || 'N/A'}</p>
-                  </div>
-                  <p className="text-sm text-gray-600">{selectedOrder.customerEmail || 'N/A'}</p>
-                  {selectedOrder.customerPhone && (
-                    <p className="text-sm text-gray-600 mt-1">Phone: {selectedOrder.customerPhone}</p>
-                  )}
-                </div>
-              </div>
-
-              {/* Items */}
-              <div className="mb-6">
-                <h4 className="text-sm font-medium text-gray-900 mb-2">
-                  Items ({selectedOrder.items?.length || 0})
-                </h4>
-                <div className="space-y-2">
-                  {selectedOrder.items?.map((item, index) => (
-                    <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{item.productName || 'Product'}</p>
-                        <p className="text-sm text-gray-600">
-                          Qty: {item.quantity || 0} × {formatCurrency(item.unitPrice || 0)}
-                        </p>
-                        {item.ndcNumber && (
-                          <p className="text-xs text-gray-500 mt-1">NDC: {item.ndcNumber}</p>
-                        )}
-                      </div>
-                      <div className="text-sm font-bold text-gray-900 ml-4">
-                        {formatCurrency(item.totalPrice || 0)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Totals */}
-              <div className="border-t pt-4">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm text-gray-600">Subtotal</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {formatCurrency(selectedOrder.subtotal || selectedOrder.total || 0)}
-                  </span>
-                </div>
-                {selectedOrder.shippingCost > 0 && (
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-600">Shipping</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatCurrency(selectedOrder.shippingCost)}
-                    </span>
-                  </div>
-                )}
-                {selectedOrder.tax > 0 && (
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm text-gray-600">Tax</span>
-                    <span className="text-sm font-medium text-gray-900">
-                      {formatCurrency(selectedOrder.tax)}
-                    </span>
-                  </div>
-                )}
-                <div className="text-sm font-bold text-gray-900 flex justify-between items-center mt-4 pt-4 border-t">
-                  <span>Total</span>
-                  <span>{formatCurrency(selectedOrder.total || 0)}</span>
-                </div>
-              </div>
-
-              {/* Shipping Info */}
-              {selectedOrder.trackingNumber && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg">
-                  <h4 className="text-sm font-medium text-gray-900 mb-2">Shipping Information</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Tracking Number</p>
-                      <p className="text-sm font-medium text-gray-900">{selectedOrder.trackingNumber}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm text-gray-600">Carrier</p>
-                      <p className="text-sm font-medium text-gray-900">{selectedOrder.carrier || 'N/A'}</p>
-                    </div>
-                    {selectedOrder.shippedAt && (
-                      <div>
-                        <p className="text-sm text-gray-600">Shipped Date</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {formatDate(selectedOrder.shippedAt)}
-                        </p>
-                      </div>
-                    )}
-                    {selectedOrder.deliveredAt && (
-                      <div>
-                        <p className="text-sm text-gray-600">Delivered Date</p>
-                        <p className="text-sm font-medium text-gray-900">
-                          {formatDate(selectedOrder.deliveredAt)}
-                        </p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-            <div className="px-6 py-4 border-t flex justify-end space-x-3">
-              <button
-                onClick={() => {
-                  if (selectedOrder._id) {
-                    dispatch(generateInvoice(selectedOrder._id));
-                  }
-                }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                Download Invoice
-              </button>
-              <button
-                onClick={() => setStatusModal({
-                  show: true,
-                  orderId: selectedOrder._id,
-                  newStatus: selectedOrder.status
-                })}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-              >
-                Update Status
-              </button>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Close
               </button>
             </div>
           </div>

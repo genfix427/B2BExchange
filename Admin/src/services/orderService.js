@@ -3,14 +3,18 @@ import { api } from './api';
 export const orderService = {
 
   // Get order details
-  async getOrderDetails(orderId) {
-    try {
-      return await api.get(`/admin/orders/${orderId}`);
-    } catch (error) {
-      console.error('Error fetching order details:', error);
-      throw error;
-    }
-  },
+  // In your orderService.js - Update the getOrderDetails method:
+
+async getOrderDetails(orderId) {
+  try {
+    const response = await api.get(`/admin/orders/${orderId}`);
+    // Return just the data, not the entire axios response
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching order details:', error);
+    throw error;
+  }
+},
 
   // Update order status
   async updateOrderStatus(orderId, data) {
@@ -136,45 +140,6 @@ export const orderService = {
       return { success: true };
     } catch (error) {
       console.error('Error generating invoice:', error);
-      throw error;
-    }
-  },
-
-  // Export orders
-  async exportOrders(type = 'all', filters = {}) {
-    try {
-      const queryParams = new URLSearchParams();
-      queryParams.append('type', type);
-      
-      if (filters.dateFrom) queryParams.append('dateFrom', filters.dateFrom);
-      if (filters.dateTo) queryParams.append('dateTo', filters.dateTo);
-      
-      const queryString = queryParams.toString();
-      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/admin/orders/export?${queryString}`, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('adminToken')}`
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to export orders');
-      }
-
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `orders-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      
-      return { success: true };
-    } catch (error) {
-      console.error('Error exporting orders:', error);
       throw error;
     }
   },
@@ -307,5 +272,5 @@ export const orderService = {
       console.error('Error exporting orders:', error);
       throw error;
     }
-  }
+  },
 };

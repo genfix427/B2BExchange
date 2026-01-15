@@ -20,6 +20,8 @@ import AdminProtectedRoute from './components/auth/ProtectedRoute'
 import AdminOrdersPage from './pages/dashboard/AdminOrdersPage'
 import AdminAnalyticsPage from './pages/dashboard/AdminAnalyticsPage'
 import AdminProductsPage from './pages/dashboard/AdminProductsPage'
+import AdminProductDetails from './pages/dashboard/AdminProductDetails'
+import AdminOrderDetails from './pages/dashboard/AdminOrderDetails'
 
 const App = () => {
   // const dispatch = useDispatch()
@@ -51,7 +53,9 @@ const App = () => {
           <Route path="vendors/:id" element={<VendorDetailPage />} />
           <Route path="analytics" element={<AdminAnalyticsPage />} />
           <Route path="orders" element={<AdminOrdersPage />} />
+          <Route path="orders/:id" element={<AdminOrderDetails />} />
           <Route path="products" element={<AdminProductsPage />} />
+          <Route path="products/:id" element={<AdminProductDetails />} />
           <Route path="settings" element={<AdminSettingsPage />} />
         </Route>
 

@@ -149,6 +149,20 @@ export const clearOrderNotifications = createAsyncThunk(
     }
 );
 
+// In your orderSlice.js - Add this thunk with the others
+export const fetchOrderDetails = createAsyncThunk(
+  'orders/fetchOrderDetails',
+  async (orderId, { rejectWithValue }) => {
+    try {
+      const response = await orderService.getOrderDetails(orderId);
+      // Return response.data since your service layer might structure it differently
+      return response.data || response;
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch order details');
+    }
+  }
+);
+
 const initialState = {
     dashboardStats: {
         data: null,
@@ -214,6 +228,11 @@ const initialState = {
         total: 0,
         page: 1,
         pages: 1,
+        loading: false,
+        error: null
+    },
+    currentOrder: {
+        data: null,
         loading: false,
         error: null
     },
@@ -413,7 +432,7 @@ const orderSlice = createSlice({
                 state.exportLoading = false;
             });
 
-            builder
+        builder
             .addCase(clearOrderNotifications.pending, (state) => {
                 // Optionally set loading state if needed
             })
@@ -427,6 +446,26 @@ const orderSlice = createSlice({
             })
             .addCase(clearOrderNotifications.rejected, (state, action) => {
                 console.error('Failed to clear notifications:', action.payload);
+            });
+
+        builder
+            // In your orderSlice extraReducers, add this:
+            .addCase(fetchOrderDetails.pending, (state) => {
+                state.currentOrder = { loading: true, error: null, data: null };
+            })
+            .addCase(fetchOrderDetails.fulfilled, (state, action) => {
+                state.currentOrder = {
+                    loading: false,
+                    error: null,
+                    data: action.payload
+                };
+            })
+            .addCase(fetchOrderDetails.rejected, (state, action) => {
+                state.currentOrder = {
+                    loading: false,
+                    error: action.payload,
+                    data: null
+                };
             });
     }
 

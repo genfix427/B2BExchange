@@ -12,7 +12,8 @@ import {
   generateInvoice,
   exportOrdersToExcel,
   updateOrderStatus,
-  updateVendorOrderStatus
+  updateVendorOrderStatus,
+  getOrderDetails
 } from '../../controllers/admin/order.controller.js';
 import { adminProtect } from '../../middleware/auth.middleware.js';
 
@@ -34,10 +35,11 @@ router.get('/', getAllOrders);
 router.get('/vendors/:id/stats', getVendorOrderStats);
 router.get('/vendors/:id/orders/sell', getVendorSellOrders);
 router.get('/vendors/:id/orders/purchase', getVendorPurchaseOrders);
+router.put('/:orderId/vendor/:vendorId/status', updateVendorOrderStatus);
+router.get('/:id', getOrderDetails);
 
 // Order operations
 router.get('/:id/invoice', generateInvoice);
 router.put('/:id/status', updateOrderStatus);
-router.put('/:orderId/vendor/:vendorId/status', updateVendorOrderStatus);
 
 export default router;

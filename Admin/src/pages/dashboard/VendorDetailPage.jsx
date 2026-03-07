@@ -54,11 +54,10 @@ import DocumentsTab from '../../components/VendorDetails/DocumentsTab'
 import LicensesTab from '../../components/VendorDetails/LicensesTab'
 import ContactsTab from '../../components/VendorDetails/ContactsTab'
 import ProductsTab from '../../components/VendorDetails/ProductsTab'
-import OrdersTab from '../../components/VendorDetails/OrdersTab'
 import AnalyticsTab from '../../components/VendorDetails/AnalyticsTab'
 import HistoryTab from '../../components/VendorDetails/HistoryTab'
 import BankDetailsTab from '../../components/VendorDetails/BankDetailsTab'
-import OrdersTabComponent from '../../components/VendorDetails/OrdersTab/Index'
+import OrdersTabComponent from '../../components/VendorDetails/OrdersTab/Index.jsx'
 
 // Import modal components
 import RejectModal from '../../components/VendorDetails/modals/RejectModal'

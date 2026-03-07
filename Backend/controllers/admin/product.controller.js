@@ -5,6 +5,11 @@ import Vendor from '../../models/Vendor.model.js';
 import { deleteFromCloudinary } from '../../services/cloudinary.service.js';
 import stockMonitoringService from '../../services/stockMonitoring.service.js';
 
+import {
+  logProductUpdated,
+  logProductDeleted
+} from '../../services/activityLogger.service.js';
+
 // @desc    Get all products (admin)
 // @route   GET /api/admin/products
 // @access  Private (Admin)
@@ -224,70 +229,108 @@ export const getProductAdmin = async (req, res, next) => {
 // @route   PUT /api/admin/products/:id
 // @access  Private (Admin)
 export const updateProductAdmin = async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.id);
+  try {
+    const product = await Product.findById(req.params.id).populate(
+      'vendor',
+      'pharmacyInfo.legalBusinessName pharmacyInfo.dba'
+    );
 
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        // Admin can update any field except ndcNumber (unique identifier)
-        const updates = req.body;
-        delete updates.ndcNumber; // Prevent NDC number changes
-
-        // Update product
-        Object.assign(product, updates);
-
-        // Update status if quantity changes
-        if (updates.quantityInStock !== undefined) {
-            product.status = updates.quantityInStock > 0 ? 'active' : 'out_of_stock';
-        }
-
-        await product.save();
-
-        res.status(200).json({
-            success: true,
-            message: 'Product updated successfully',
-            data: product
-        });
-    } catch (error) {
-        next(error);
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
     }
+
+    // Capture old values for change tracking
+    const oldValues = {
+      productName: product.productName,
+      price: product.price,
+      quantityInStock: product.quantityInStock,
+      status: product.status,
+      manufacturer: product.manufacturer
+    };
+
+    const updates = req.body;
+    delete updates.ndcNumber;
+
+    Object.assign(product, updates);
+    if (updates.quantityInStock !== undefined) {
+      product.status = updates.quantityInStock > 0 ? 'active' : 'out_of_stock';
+    }
+
+    await product.save();
+
+    // Build a changes object (only fields that actually changed)
+    const changes = {};
+    for (const key of Object.keys(oldValues)) {
+      if (updates[key] !== undefined && String(updates[key]) !== String(oldValues[key])) {
+        changes[key] = { from: oldValues[key], to: updates[key] };
+      }
+    }
+
+    // ✅ LOG ACTIVITY
+    const vendorInfo = {
+      id: product.vendor?._id || product.vendor,
+      name: product.vendor?.pharmacyInfo?.legalBusinessName
+        || product.vendor?.pharmacyInfo?.dba
+        || 'Unknown'
+    };
+    await logProductUpdated(req.admin, product, vendorInfo, changes, req);
+
+    res.status(200).json({
+      success: true,
+      message: 'Product updated successfully',
+      data: product
+    });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // @desc    Delete product (admin)
 // @route   DELETE /api/admin/products/:id
 // @access  Private (Admin)
 export const deleteProductAdmin = async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.id);
+  try {
+    const product = await Product.findById(req.params.id).populate(
+      'vendor',
+      'pharmacyInfo.legalBusinessName pharmacyInfo.dba'
+    );
 
-        if (!product) {
-            return res.status(404).json({
-                success: false,
-                message: 'Product not found'
-            });
-        }
-
-        // Delete image from Cloudinary
-        try {
-            await deleteFromCloudinary(product.image.publicId);
-        } catch (deleteError) {
-            console.error('Image deletion error:', deleteError);
-        }
-
-        await product.deleteOne();
-
-        res.status(200).json({
-            success: true,
-            message: 'Product deleted successfully'
-        });
-    } catch (error) {
-        next(error);
+    if (!product) {
+      return res.status(404).json({ success: false, message: 'Product not found' });
     }
+
+    // Gather info BEFORE deleting
+    const vendorInfo = {
+      id: product.vendor?._id || product.vendor,
+      name: product.vendor?.pharmacyInfo?.legalBusinessName
+        || product.vendor?.pharmacyInfo?.dba
+        || 'Unknown'
+    };
+    const productSnapshot = {
+      _id: product._id,
+      productName: product.productName,
+      ndcNumber: product.ndcNumber,
+      manufacturer: product.manufacturer,
+      price: product.price,
+      quantityInStock: product.quantityInStock,
+      vendor: product.vendor
+    };
+
+    try {
+      await deleteFromCloudinary(product.image.publicId);
+    } catch (deleteError) {
+      console.error('Image deletion error:', deleteError);
+    }
+
+    await product.deleteOne();
+
+    // ✅ LOG ACTIVITY
+    await logProductDeleted(req.admin, productSnapshot, vendorInfo, req);
+
+    res.status(200).json({ success: true, message: 'Product deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
 };
 
 // @desc    Get product statistics (admin)

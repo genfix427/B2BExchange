@@ -22,6 +22,7 @@ import AdminAnalyticsPage from './pages/dashboard/AdminAnalyticsPage'
 import AdminProductsPage from './pages/dashboard/AdminProductsPage'
 import AdminProductDetails from './pages/dashboard/AdminProductDetails'
 import AdminOrderDetails from './pages/dashboard/AdminOrderDetails'
+import AdminHistory from './pages/dashboard/AdminHistory'
 
 const App = () => {
   // const dispatch = useDispatch()
@@ -57,6 +58,7 @@ const App = () => {
           <Route path="products" element={<AdminProductsPage />} />
           <Route path="products/:id" element={<AdminProductDetails />} />
           <Route path="settings" element={<AdminSettingsPage />} />
+          <Route path="history" element={<AdminHistory />} />
         </Route>
 
         {/* Root redirect to admin login */}

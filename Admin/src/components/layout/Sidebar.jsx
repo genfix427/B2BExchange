@@ -31,6 +31,7 @@ const navItems = [
   { to: 'orders', icon: ShoppingCart, label: 'Orders' },
   { to: 'products', icon: Package, label: 'Products' },
   { to: 'settings', icon: Settings, label: 'Settings' },
+  { to: 'history', icon: BarChart3, label: 'History' }
 ]
   
   return (

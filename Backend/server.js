@@ -23,6 +23,7 @@ import profileRoutes from './routes/profile.routes.js';
 import adminAuthRoutes from './routes/adminAuth.routes.js';
 import adminOrderRoutes from './routes/admin/order.routes.js';
 import adminVendorAnalyticsRoutes from './routes/admin/vendorAnalytics.routes.js';
+import activityHistoryRoutes from './routes/admin/activityHistory.routes.js';
 
 import vendorProductRoutes from './routes/vendor/product.routes.js';
 import storeProductRoutes from './routes/store/product.routes.js';
@@ -133,6 +134,7 @@ app.use('/api/store/products', storeProductRoutes);
 app.use('/api/admin/products', adminProductRoutes);
 app.use('/api/admin/orders', adminOrderRoutes);
 app.use('/api/admin/analytics/vendors', adminVendorAnalyticsRoutes);
+app.use('/api/admin/activity-history', activityHistoryRoutes);
 
 app.use('/api/vendor/offers', offerRoutes);
 app.use('/api/vendor/notifications', notificationRoutes);

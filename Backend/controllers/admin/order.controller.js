@@ -1,11 +1,13 @@
 import Order from '../../models/Order.model.js';
 import Vendor from '../../models/Vendor.model.js';
-import Product from '../../models/Product.model.js';
 import mongoose from 'mongoose';
 import ExcelJS from 'exceljs';
 import PDFDocument from 'pdfkit';
-import fs from 'fs';
-import path from 'path';
+
+import {
+  logOrderStatusUpdated,
+  logVendorOrderStatusUpdated
+} from '../../services/activityLogger.service.js';
 
 // @desc    Get vendor-specific statistics
 // @route   GET /api/admin/vendors/:id/orders/stats
@@ -1219,38 +1221,25 @@ export const exportOrdersToExcel = async (req, res, next) => {
 export const updateOrderStatus = async (req, res, next) => {
   try {
     const { status, note } = req.body;
-    
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found'
-      });
+      return res.status(404).json({ success: false, message: 'Order not found' });
     }
-    
-    // Validate status
+
     const validStatuses = ['pending', 'confirmed', 'processing', 'shipped', 'delivered', 'cancelled'];
     if (!validStatuses.includes(status)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid status'
-      });
+      return res.status(400).json({ success: false, message: 'Invalid status' });
     }
-    
-    // Update order status
+
+    const oldStatus = order.status;
     order.status = status;
-    
-    // Add to status history
-    order.addStatusHistory(
-      status,
-      req.user._id,
-      'admin',
-      note || `Status updated by admin`
-    );
-    
+    order.addStatusHistory(status, req.admin._id, 'admin', note || 'Status updated by admin');
     await order.save();
-    
+
+    // ✅ LOG ACTIVITY
+    await logOrderStatusUpdated(req.admin, order, oldStatus, status, note, req);
+
     res.status(200).json({
       success: true,
       message: 'Order status updated successfully',
@@ -1268,35 +1257,24 @@ export const updateVendorOrderStatus = async (req, res, next) => {
   try {
     const { status, trackingNumber, carrier, note } = req.body;
     const { orderId, vendorId } = req.params;
-    
+
     const order = await Order.findById(orderId);
-    
     if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: 'Order not found'
-      });
+      return res.status(404).json({ success: false, message: 'Order not found' });
     }
-    
-    // Update vendor order status
-    order.updateVendorOrderStatus(
-      vendorId,
-      status,
-      trackingNumber,
-      carrier,
-      note
-    );
-    
-    // Add to status history
+
+    order.updateVendorOrderStatus(vendorId, status, trackingNumber, carrier, note);
     order.addStatusHistory(
       status,
-      req.user._id,
+      req.admin._id,
       'admin',
       `Vendor order status updated for vendor ${vendorId}: ${note || ''}`
     );
-    
     await order.save();
-    
+
+    // ✅ LOG ACTIVITY
+    await logVendorOrderStatusUpdated(req.admin, order, vendorId, status, trackingNumber, req);
+
     res.status(200).json({
       success: true,
       message: 'Vendor order status updated successfully',
@@ -1306,7 +1284,6 @@ export const updateVendorOrderStatus = async (req, res, next) => {
     next(error);
   }
 };
-
 // @desc    Get order details
 // @route   GET /api/admin/orders/:id
 // @access  Private (Admin)

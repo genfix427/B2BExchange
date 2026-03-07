@@ -38,7 +38,8 @@ const DashboardLayout = () => {
     { name: 'Analytics', href: '/admin/analytics', icon: BarChart3 },
     { name: 'Orders', href: '/admin/orders', icon: ShoppingCart },
     { name: 'Products', href: '/admin/products', icon: Package },
-    { name: 'Settings', href: '/admin/settings', icon: Settings }
+    { name: 'Settings', href: '/admin/settings', icon: Settings },
+    { name: 'History', href: '/admin/history', icon: BarChart3 }
   ]
 
   const isActive = (path) => location.pathname === path

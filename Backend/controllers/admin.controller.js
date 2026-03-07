@@ -3,6 +3,14 @@ import Admin from '../models/Admin.model.js';
 import { sendVendorApprovalEmail, sendVendorRejectionEmail } from '../services/email.service.js';
 import { format } from 'date-fns';
 
+import {
+  logVendorApproved,
+  logVendorRejected,
+  logVendorSuspended,
+  logVendorReactivated,
+  logAdminProfileUpdated
+} from '../services/activityLogger.service.js';
+
 // @desc    Get admin profile
 // @route   GET /api/admin/profile
 // @access  Private (Admin)
@@ -32,36 +40,34 @@ export const getAdminProfile = async (req, res, next) => {
 export const updateAdminProfile = async (req, res, next) => {
   try {
     const { firstName, lastName, email, currentPassword, newPassword } = req.body;
-    
+
     const admin = await Admin.findById(req.admin._id);
-    
     if (!admin) {
-      return res.status(404).json({
-        success: false,
-        message: 'Admin not found'
-      });
+      return res.status(404).json({ success: false, message: 'Admin not found' });
     }
 
-    // Update basic info
+    const updatedFields = [];
+    if (firstName && firstName !== admin.firstName) updatedFields.push('firstName');
+    if (lastName && lastName !== admin.lastName) updatedFields.push('lastName');
+    if (email && email !== admin.email) updatedFields.push('email');
+
     if (firstName) admin.firstName = firstName;
     if (lastName) admin.lastName = lastName;
     if (email) admin.email = email;
 
-    // Update password if provided
     if (currentPassword && newPassword) {
       const isPasswordValid = await admin.comparePassword(currentPassword);
-      
       if (!isPasswordValid) {
-        return res.status(400).json({
-          success: false,
-          message: 'Current password is incorrect'
-        });
+        return res.status(400).json({ success: false, message: 'Current password is incorrect' });
       }
-      
       admin.password = newPassword;
+      updatedFields.push('password');
     }
 
     await admin.save();
+
+    // ✅ LOG ACTIVITY
+    await logAdminProfileUpdated(req.admin, updatedFields, req);
 
     res.status(200).json({
       success: true,
@@ -380,50 +386,35 @@ export const getVendorDetails = async (req, res, next) => {
 // @access  Private (Admin with permission)
 export const approveVendor = async (req, res, next) => {
   try {
-    // Check admin permissions
     if (!req.admin.permissions?.canApproveVendors) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to approve vendors'
-      });
+      return res.status(403).json({ success: false, message: 'Not authorized to approve vendors' });
     }
 
     const vendor = await Vendor.findById(req.params.id);
-
     if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: 'Vendor not found'
-      });
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
     }
-
     if (vendor.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Vendor is already ${vendor.status}`
-      });
+      return res.status(400).json({ success: false, message: `Vendor is already ${vendor.status}` });
     }
 
-    // Update vendor status
     vendor.status = 'approved';
     vendor.approvedBy = req.admin._id;
     vendor.approvedAt = new Date();
     await vendor.save();
 
-    // Send approval email
     await sendVendorApprovalEmail(
       vendor.pharmacyOwner.email,
       `${vendor.pharmacyOwner.firstName} ${vendor.pharmacyOwner.lastName}`
     );
 
+    // ✅ LOG ACTIVITY
+    await logVendorApproved(req.admin, vendor, req);
+
     res.status(200).json({
       success: true,
       message: 'Vendor approved successfully',
-      data: {
-        id: vendor._id,
-        status: vendor.status,
-        approvedAt: vendor.approvedAt
-      }
+      data: { id: vendor._id, status: vendor.status, approvedAt: vendor.approvedAt }
     });
   } catch (error) {
     next(error);
@@ -436,14 +427,10 @@ export const approveVendor = async (req, res, next) => {
 export const rejectVendor = async (req, res, next) => {
   try {
     if (!req.admin.permissions?.canApproveVendors) {
-      return res.status(403).json({
-        success: false,
-        message: 'Not authorized to reject vendors'
-      });
+      return res.status(403).json({ success: false, message: 'Not authorized to reject vendors' });
     }
 
     const { rejectionReason } = req.body;
-
     if (!rejectionReason || rejectionReason.trim().length < 10) {
       return res.status(400).json({
         success: false,
@@ -452,19 +439,11 @@ export const rejectVendor = async (req, res, next) => {
     }
 
     const vendor = await Vendor.findById(req.params.id);
-
     if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: 'Vendor not found'
-      });
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
     }
-
     if (vendor.status !== 'pending') {
-      return res.status(400).json({
-        success: false,
-        message: `Vendor is already ${vendor.status}`
-      });
+      return res.status(400).json({ success: false, message: `Vendor is already ${vendor.status}` });
     }
 
     vendor.status = 'rejected';
@@ -472,17 +451,16 @@ export const rejectVendor = async (req, res, next) => {
     vendor.approvedBy = req.admin._id;
     await vendor.save();
 
-    // Send rejection email
     await sendVendorRejectionEmail(
       vendor.pharmacyOwner.email,
       `${vendor.pharmacyOwner.firstName} ${vendor.pharmacyOwner.lastName}`,
       rejectionReason
     );
 
-    res.status(200).json({
-      success: true,
-      message: 'Vendor rejected successfully'
-    });
+    // ✅ LOG ACTIVITY
+    await logVendorRejected(req.admin, vendor, rejectionReason, req);
+
+    res.status(200).json({ success: true, message: 'Vendor rejected successfully' });
   } catch (error) {
     next(error);
   }
@@ -494,7 +472,6 @@ export const rejectVendor = async (req, res, next) => {
 export const suspendVendor = async (req, res, next) => {
   try {
     const { reason } = req.body;
-
     if (!reason || reason.trim().length < 5) {
       return res.status(400).json({
         success: false,
@@ -503,19 +480,11 @@ export const suspendVendor = async (req, res, next) => {
     }
 
     const vendor = await Vendor.findById(req.params.id);
-
     if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: 'Vendor not found'
-      });
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
     }
-
     if (vendor.status === 'suspended') {
-      return res.status(400).json({
-        success: false,
-        message: 'Vendor is already suspended'
-      });
+      return res.status(400).json({ success: false, message: 'Vendor is already suspended' });
     }
 
     const previousStatus = vendor.status;
@@ -526,7 +495,8 @@ export const suspendVendor = async (req, res, next) => {
     vendor.previousStatus = previousStatus;
     await vendor.save();
 
-    // TODO: Send suspension email
+    // ✅ LOG ACTIVITY
+    await logVendorSuspended(req.admin, vendor, reason, previousStatus, req);
 
     res.status(200).json({
       success: true,
@@ -549,37 +519,28 @@ export const suspendVendor = async (req, res, next) => {
 export const reactivateVendor = async (req, res, next) => {
   try {
     const vendor = await Vendor.findById(req.params.id);
-
     if (!vendor) {
-      return res.status(404).json({
-        success: false,
-        message: 'Vendor not found'
-      });
+      return res.status(404).json({ success: false, message: 'Vendor not found' });
     }
-
     if (vendor.status !== 'suspended') {
-      return res.status(400).json({
-        success: false,
-        message: 'Vendor is not suspended'
-      });
+      return res.status(400).json({ success: false, message: 'Vendor is not suspended' });
     }
 
-    vendor.status = vendor.previousStatus || 'approved';
+    const newStatus = vendor.previousStatus || 'approved';
+    vendor.status = newStatus;
     vendor.suspensionReason = undefined;
     vendor.suspendedBy = undefined;
     vendor.suspendedAt = undefined;
     vendor.previousStatus = undefined;
     await vendor.save();
 
-    // TODO: Send reactivation email
+    // ✅ LOG ACTIVITY
+    await logVendorReactivated(req.admin, vendor, newStatus, req);
 
     res.status(200).json({
       success: true,
       message: 'Vendor reactivated successfully',
-      data: {
-        id: vendor._id,
-        status: vendor.status
-      }
+      data: { id: vendor._id, status: vendor.status }
     });
   } catch (error) {
     next(error);

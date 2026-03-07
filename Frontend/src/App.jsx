@@ -48,6 +48,9 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 import VendorLayout from './components/layout/VendorLayout'
 import VendorOrderDetailsPage from './pages/vendor/VendorOrderDetailsPage'
 import StatusCheckRoute from './components/common/StatusCheckRoute'
+import ReceivedOffersPage from './pages/vendor/ReceivedOffersPage'
+import SentOffersPage from './pages/vendor/SentOffersPage'
+import NotificationsPage from './pages/vendor/NotificationsPage'
 
 const StoreOrdersLayout = () => {
   return (
@@ -141,9 +144,25 @@ const AppContent = () => {
           />
 
           <Route path="/store/orders" element={<StoreOrdersLayout />}>
-  <Route index element={<PurchaseOrdersPage />} />
-  <Route path=":id" element={<OrderDetailsPage />} />
-</Route>
+            <Route index element={<PurchaseOrdersPage />} />
+            <Route path=":id" element={<OrderDetailsPage />} />
+          </Route>
+
+          <Route path="/vendor/offers/received" element={
+            <ProtectedRoute>
+              <ReceivedOffersPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/vendor/offers/sent" element={
+            <ProtectedRoute>
+              <SentOffersPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/vendor/notifications" element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          } />
 
           {/* Legacy Routes - Redirect to new structure */}
           <Route path="/dashboard" element={<Navigate to="/vendor/dashboard" replace />} />

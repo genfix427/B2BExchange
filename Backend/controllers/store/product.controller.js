@@ -114,32 +114,41 @@ export const getStoreProducts = async (req, res, next) => {
       query.quantityInStock = { $gt: 0 };
       console.log('🛍️ Applying stock filter: quantityInStock > 0');
     }
-
-    // In the response mapping, add stockStatus:
-    res.status(200).json({
-      success: true,
-      count: products.length,
-      total,
-      page: Number(page),
-      pages: Math.ceil(total / limit),
-      data: products.map(product => ({
-        _id: product._id,
-        ndcNumber: product.ndcNumber,
-        productName: product.productName,
-        strength: product.strength,
-        dosageForm: product.dosageForm,
-        manufacturer: product.manufacturer,
-        price: product.price,
-        quantityInStock: product.quantityInStock,
-        stockStatus: product.stockStatus, // Add this
-        image: product.image,
-        vendor: product.vendor?._id,
-        vendorName: product.vendorName || (product.vendor?.pharmacyInfo?.legalBusinessName || product.vendor?.pharmacyInfo?.dba),
-        status: product.status,
-        createdAt: product.createdAt,
-        updatedAt: product.updatedAt
-      }))
-    });
+    
+// response
+res.status(200).json({
+  success: true,
+  count: products.length,
+  total,
+  page: Number(page),
+  pages: Math.ceil(total / limit),
+  data: products.map(product => ({
+    _id: product._id,
+    ndcNumber: product.ndcNumber,
+    productName: product.productName,
+    strength: product.strength,
+    dosageForm: product.dosageForm,
+    manufacturer: product.manufacturer,
+    expirationDate: product.expirationDate,
+    packageCondition: product.packageCondition,
+    originalPackSize: product.originalPackSize,
+    packQuantity: product.packQuantity,
+    lotNumber: product.lotNumber,
+    isFridgeProduct: product.isFridgeProduct,
+    price: product.price,
+    quantityInStock: product.quantityInStock,
+    stockStatus: product.stockStatus,
+    image: product.image,
+    vendor: product.vendor?._id,
+    vendorName:
+      product.vendorName ||
+      product.vendor?.pharmacyInfo?.legalBusinessName ||
+      product.vendor?.pharmacyInfo?.dba,
+    status: product.status,
+    createdAt: product.createdAt,
+    updatedAt: product.updatedAt
+  }))
+});
   } catch (error) {
     console.error('🛍️ Error fetching store products:', error);
     next(error);

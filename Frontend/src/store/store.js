@@ -4,6 +4,8 @@ import storage from 'redux-persist/lib/storage'
 import { combineReducers } from 'redux'
 import authReducer from './slices/authSlice'
 import vendorReducer from './slices/vendorSlice'
+import offerReducer from './slices/offerSlice';
+import notificationReducer from './slices/notificationSlice';
 import registrationReducer from './slices/registrationSlice'
 import vendorProductReducer from './slices/vendorProductSlice';
 import storeReducer from './slices/storeSlice';
@@ -25,6 +27,8 @@ const rootReducer = combineReducers({
   auth: persistReducer(authPersistConfig, authReducer),
   vendor: vendorReducer,
   vendorProducts: vendorProductReducer,
+  offers: offerReducer,         
+  notifications: notificationReducer,
   store: storeReducer,
   registration: persistReducer(registrationPersistConfig, registrationReducer)
 })

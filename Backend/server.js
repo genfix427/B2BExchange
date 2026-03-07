@@ -28,6 +28,9 @@ import vendorProductRoutes from './routes/vendor/product.routes.js';
 import storeProductRoutes from './routes/store/product.routes.js';
 import adminProductRoutes from './routes/admin/product.routes.js';
 
+import offerRoutes from './routes/vendor/offer.routes.js';
+import notificationRoutes from './routes/vendor/notification.routes.js';
+
 import cartRoutes from './routes/store/cart.routes.js';
 import wishlistRoutes from './routes/store/wishlist.routes.js';
 import orderRoutes from './routes/store/order.routes.js';
@@ -130,6 +133,9 @@ app.use('/api/store/products', storeProductRoutes);
 app.use('/api/admin/products', adminProductRoutes);
 app.use('/api/admin/orders', adminOrderRoutes);
 app.use('/api/admin/analytics/vendors', adminVendorAnalyticsRoutes);
+
+app.use('/api/vendor/offers', offerRoutes);
+app.use('/api/vendor/notifications', notificationRoutes);
 
 app.use('/api/store/cart', cartRoutes);
 app.use('/api/store/wishlist', wishlistRoutes);

@@ -3,9 +3,9 @@ import { useSelector } from 'react-redux'
 import { Link } from 'react-router-dom'
 import RegistrationStepper from '../../components/auth/Registration/RegistrationStepper'
 import Step1PharmacyInfo from '../../components/auth/Registration/Step1PharmacyInfo'
-import Step2PharmacyOwner from '../../components/auth/Registration/Step2PharmacyOwner'
+import Step2PharmacyLicense from '../../components/auth/Registration/Step2PharmacyLicense'
 import Step3PrimaryContact from '../../components/auth/Registration/Step3PrimaryContact'
-import Step4PharmacyLicense from '../../components/auth/Registration/Step4PharmacyLicense'
+import Step4PharmacyOwner from '../../components/auth/Registration/Step4PharmacyOwner'
 import Step5PharmacyQuestions from '../../components/auth/Registration/Step5PharmacyQuestions'
 import Step6ReferralInfo from '../../components/auth/Registration/Step6ReferralInfo'
 import Step7BankAccount from '../../components/auth/Registration/Step7BankAccount'
@@ -20,11 +20,11 @@ const RegisterPage = () => {
       case 1:
         return <Step1PharmacyInfo />
       case 2:
-        return <Step2PharmacyOwner />
+        return <Step2PharmacyLicense />
       case 3:
         return <Step3PrimaryContact />
       case 4:
-        return <Step4PharmacyLicense />
+        return <Step4PharmacyOwner />
       case 5:
         return <Step5PharmacyQuestions />
       case 6:

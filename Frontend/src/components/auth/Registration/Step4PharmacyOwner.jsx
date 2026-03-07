@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { useSelector, useDispatch } from 'react-redux'
 import { updateFormData, nextStep, prevStep } from '../../../store/slices/registrationSlice'
 
-const Step2PharmacyOwner = () => {
+const Step4PharmacyOwner = () => {
   const dispatch = useDispatch()
   const { formData } = useSelector((state) => state.registration)
   
@@ -21,7 +21,7 @@ const Step2PharmacyOwner = () => {
     }
     
     dispatch(updateFormData({
-      step: 2,
+      step: 4,
       data
     }))
     dispatch(nextStep())
@@ -33,7 +33,7 @@ const Step2PharmacyOwner = () => {
   
   return (
     <div className="max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 2: Pharmacy Owner Information</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 4: Pharmacy Owner Information</h2>
       
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -141,7 +141,7 @@ const Step2PharmacyOwner = () => {
             type="submit"
             className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            Next: Primary Contact
+            Next: Pharmacy Questions
           </button>
         </div>
       </form>
@@ -149,4 +149,4 @@ const Step2PharmacyOwner = () => {
   )
 }
 
-export default Step2PharmacyOwner
+export default Step4PharmacyOwner

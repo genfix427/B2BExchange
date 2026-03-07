@@ -7,9 +7,9 @@ const RegistrationStepper = () => {
   
   const steps = [
     { number: 1, title: 'Pharmacy Info' },
-    { number: 2, title: 'Pharmacy Owner' },
+    { number: 2, title: 'Pharmacy License' },
     { number: 3, title: 'Primary Contact' },
-    { number: 4, title: 'Pharmacy License' },
+    { number: 4, title: 'Pharmacy Owner' },
     { number: 5, title: 'Pharmacy Questions' },
     { number: 6, title: 'Referral Info' },
     { number: 7, title: 'Bank Account' },

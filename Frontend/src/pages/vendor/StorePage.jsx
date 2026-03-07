@@ -30,7 +30,13 @@ import {
   Loader2,
   Sparkles,
   ThumbsUp,
-  Info
+  Info,
+  ShoppingCart,
+  DollarSign,
+  Calendar,
+  Grid,
+  Table as TableIcon,
+  Thermometer
 } from 'lucide-react';
 import {
   fetchStoreProducts,
@@ -112,17 +118,16 @@ const showInfoToast = (message) => {
   });
 };
 
-// Vendor access denied component with enhanced UI
+// Vendor access denied component
 const VendorAccessDenied = () => (
   <div className="min-h-screen bg-gradient-to-br from-teal-50 via-emerald-50 to-white relative overflow-hidden">
     <FloatingShape shape="circle" className="top-10 left-10" />
     <FloatingShape shape="square" className="top-20 right-20" />
     <FloatingShape shape="triangle" className="bottom-20 left-1/4" />
     <FloatingShape shape="circle" className="bottom-10 right-10" />
-    
+
     <div className="relative z-10 flex items-center justify-center min-h-screen px-4">
       <div className="max-w-4xl w-full">
-        {/* Main message card */}
         <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-2xl p-8 md:p-12 text-center transform hover:scale-105 transition-all duration-500">
           <div className="mb-8">
             <div className="inline-flex items-center justify-center w-24 h-24 bg-gradient-to-br from-teal-400 to-emerald-500 rounded-full mb-6 animate-bounce">
@@ -139,7 +144,6 @@ const VendorAccessDenied = () => (
             </p>
           </div>
 
-          {/* Action buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Link
               to="/vendor/login"
@@ -157,259 +161,126 @@ const VendorAccessDenied = () => (
               Become a Vendor
             </Link>
           </div>
-
-          {/* Features grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-12">
-            <div className="text-center group">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-teal-100 rounded-2xl mb-4 group-hover:bg-teal-200 transition-colors">
-                <Shield className="w-8 h-8 text-teal-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Trusted Platform</h3>
-              <p className="text-sm text-gray-600">Secure B2B pharmaceutical marketplace</p>
-            </div>
-            <div className="text-center group">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-emerald-100 rounded-2xl mb-4 group-hover:bg-emerald-200 transition-colors">
-                <Zap className="w-8 h-8 text-emerald-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Fast Access</h3>
-              <p className="text-sm text-gray-600">Quick vendor verification process</p>
-            </div>
-            <div className="text-center group">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-teal-100 rounded-2xl mb-4 group-hover:bg-teal-200 transition-colors">
-                <BarChart3 className="w-8 h-8 text-teal-600" />
-              </div>
-              <h3 className="font-semibold text-gray-900 mb-2">Grow Business</h3>
-              <p className="text-sm text-gray-600">Expand your pharmaceutical reach</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats section */}
-        <div className="mt-12 grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center hover:bg-white transition-all duration-300">
-            <div className="text-3xl font-bold text-teal-600 mb-2">10K+</div>
-            <div className="text-sm text-gray-600">Active Vendors</div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center hover:bg-white transition-all duration-300">
-            <div className="text-3xl font-bold text-emerald-600 mb-2">50K+</div>
-            <div className="text-sm text-gray-600">Products</div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center hover:bg-white transition-all duration-300">
-            <div className="text-3xl font-bold text-teal-600 mb-2">99.9%</div>
-            <div className="text-sm text-gray-600">Uptime</div>
-          </div>
-          <div className="bg-white/80 backdrop-blur-sm rounded-2xl p-6 text-center hover:bg-white transition-all duration-300">
-            <div className="text-3xl font-bold text-emerald-600 mb-2">24/7</div>
-            <div className="text-sm text-gray-600">Support</div>
-          </div>
         </div>
       </div>
     </div>
   </div>
 );
 
-// Enhanced Product Card Component with animations
-const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) => {
-  const [imageError, setImageError] = useState(false);
-  const [isHovered, setIsHovered] = useState(false);
-  const [isAddingToCart, setIsAddingToCart] = useState(false);
+// Make an Offer Modal Component
+const MakeOfferModal = ({ isOpen, onClose, product, onSubmit }) => {
+  const [offerPrice, setOfferPrice] = useState('');
+  const [quantity, setQuantity] = useState(1);
+  const [message, setMessage] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const formatPrice = (price) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD'
-    }).format(price || 0)
-  }
+  if (!isOpen) return null;
 
-  const getStockStatus = (stock) => {
-    if (stock <= 0) return { text: 'Out of Stock', color: 'bg-red-100 text-red-800', icon: <AlertCircle className="w-3 h-3" /> };
-    if (stock < 5) return { text: `Limited (${stock})`, color: 'bg-orange-100 text-orange-800', icon: <TrendingUp className="w-3 h-3" /> };
-    if (stock < 10) return { text: `Low Stock (${stock})`, color: 'bg-yellow-100 text-yellow-800', icon: <Activity className="w-3 h-3" /> };
-    return { text: 'In Stock', color: 'bg-emerald-100 text-emerald-800', icon: <CheckCircle className="w-3 h-3" /> };
-  };
-
-  const stockStatus = getStockStatus(product.quantityInStock);
-
-  const handleAddToCartClick = async () => {
-    if (product.quantityInStock <= 0) {
-      showInfoToast('Product is out of stock');
-      return;
-    }
-
-    setIsAddingToCart(true);
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
     try {
-      await onAddToCart();
-      showSuccessToast(`${product.productName} added to cart!`);
+      await onSubmit({
+        productId: product._id,
+        offerPrice: parseFloat(offerPrice),
+        quantity: parseInt(quantity),
+        message
+      });
+      showSuccessToast('Offer submitted successfully!');
+      onClose();
     } catch (error) {
-      showErrorToast('Failed to add to cart');
+      showErrorToast('Failed to submit offer');
     } finally {
-      setIsAddingToCart(false);
-    }
-  };
-
-  const handleWishlistClick = async () => {
-    try {
-      await onToggleWishlist();
-      if (isInWishlist) {
-        showInfoToast(`${product.productName} removed from wishlist`);
-      } else {
-        showSuccessToast(`${product.productName} added to wishlist!`);
-      }
-    } catch (error) {
-      showErrorToast('Failed to update wishlist');
+      setIsSubmitting(false);
     }
   };
 
   return (
-    <div 
-      className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden group transform hover:-translate-y-2 relative"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Sparkle effect on hover */}
-      {isHovered && (
-        <div className="absolute top-2 right-2 z-20">
-          <Sparkles className="w-5 h-5 text-teal-400 animate-pulse" />
-        </div>
-      )}
-
-      {/* Image section with overlay */}
-      <div className="relative h-56 bg-gradient-to-br from-teal-50 to-emerald-50 overflow-hidden">
-        {product.image?.url && !imageError ? (
-          <img
-            src={product.image.url}
-            alt={product.productName}
-            className="w-full h-full object-contain p-6 transition-transform duration-500 group-hover:scale-110"
-            onError={() => setImageError(true)}
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center">
-            <div className="text-center">
-              <Pill className="h-16 w-16 text-teal-400 mb-2 mx-auto animate-pulse" />
-              <p className="text-sm text-gray-500">No Image</p>
-            </div>
-          </div>
-        )}
-
-        {/* Overlay on hover */}
-        <div className={`absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${isHovered ? 'opacity-100' : ''}`}>
-          <div className="absolute bottom-4 left-4 right-4 flex justify-between">
-            <button
-              onClick={handleWishlistClick}
-              className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110"
-            >
-              <Heart className={`w-5 h-5 ${isInWishlist ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
-            </button>
-            <button className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-110">
-              <Eye className="w-5 h-5 text-gray-600" />
-            </button>
-          </div>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl max-w-lg w-full p-6 transform animate-slideUp">
+        <div className="flex justify-between items-center mb-4">
+          <h3 className="text-xl font-bold text-gray-900">Make an Offer</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X className="w-6 h-6" />
+          </button>
         </div>
 
-        {/* Stock status badge */}
-        <div className="absolute top-4 left-4">
-          <span className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-medium ${stockStatus.color} backdrop-blur-sm`}>
-            {stockStatus.icon}
-            {stockStatus.text}
-          </span>
+        <div className="mb-6 p-4 bg-gray-50 rounded-lg">
+          <h4 className="font-semibold text-gray-900">{product.productName}</h4>
+          <p className="text-sm text-gray-600">Regular Price: ${product.price?.toFixed(2)}</p>
+          <p className="text-sm text-gray-600">Pack Size: {product.originalPackSize || product.packQuantity || 'N/A'}</p>
         </div>
 
-        {/* Vendor badge */}
-        <div className="absolute top-4 right-4">
-          <span className="inline-flex items-center gap-1 px-3 py-1.5 bg-white/90 backdrop-blur-sm rounded-full text-xs font-medium text-gray-700">
-            <Store className="w-3 h-3" />
-            {product.vendorName || 'Vendor'}
-          </span>
-        </div>
-      </div>
-
-      {/* Product details */}
-      <div className="p-6 space-y-4">
-        {/* Title and NDC */}
-        <div>
-          <h3 className="font-bold text-gray-900 text-lg leading-tight mb-2 group-hover:text-teal-600 transition-colors">
-            {product.productName}
-          </h3>
-          <p className="text-sm text-gray-500 font-mono">
-            NDC: {product.ndcNumber || 'N/A'}
-          </p>
-        </div>
-
-        {/* Product specs */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Activity className="w-4 h-4 text-teal-500" />
-            <span className="text-gray-700">{product.strength}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Pill className="w-4 h-4 text-emerald-500" />
-            <span className="text-gray-700">{product.dosageForm}</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm">
-            <Award className="w-4 h-4 text-teal-500" />
-            <span className="text-gray-700">{product.manufacturer || 'Unknown Manufacturer'}</span>
-          </div>
-        </div>
-
-        {/* Price section */}
-        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <div className="text-2xl font-bold text-teal-600">
-              {formatPrice(product.price)}
-            </div>
-            <div className="text-xs text-gray-500 mt-1">
-              per unit
-            </div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Your Offer Price ($) *
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              min="0.01"
+              max={product.price}
+              value={offerPrice}
+              onChange={(e) => setOfferPrice(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              placeholder="Enter your offer price"
+            />
           </div>
-          <div className="text-right">
-            <div className="text-sm text-gray-600">
-              Stock: <span className={`font-semibold ${product.quantityInStock <= 0 ? 'text-red-600' :
-                  product.quantityInStock < 5 ? 'text-orange-600' :
-                    product.quantityInStock < 10 ? 'text-yellow-600' :
-                      'text-emerald-600'
-                }`}>
-                {product.quantityInStock || 0}
-              </span>
-            </div>
-            {product.quantityInStock > 0 && product.quantityInStock < 10 && (
-              <div className="text-xs text-orange-600 font-medium">
-                Only {product.quantityInStock} left!
-              </div>
-            )}
-          </div>
-        </div>
 
-        {/* Action button */}
-        <button
-          onClick={handleAddToCartClick}
-          disabled={product.quantityInStock <= 0 || isAddingToCart}
-          className={`w-full py-3 rounded-xl font-semibold transition-all duration-300 transform hover:scale-105 relative overflow-hidden ${product.quantityInStock <= 0 || isAddingToCart
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-700 hover:to-emerald-700 shadow-lg hover:shadow-xl'
-            }`}
-        >
-          {isAddingToCart ? (
-            <span className="flex items-center justify-center gap-2">
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Adding...
-            </span>
-          ) : product.quantityInStock <= 0 ? (
-            <span className="flex items-center justify-center gap-2">
-              <Package className="w-5 h-5" />
-              Out of Stock
-            </span>
-          ) : product.quantityInStock < 5 ? (
-            <span className="flex items-center justify-center gap-2">
-              <TrendingUp className="w-5 h-5" />
-              Limited Stock - Add to Cart
-            </span>
-          ) : (
-            <span className="flex items-center justify-center gap-2">
-              <ShoppingBag className="w-5 h-5" />
-              Add to Cart
-            </span>
-          )}
-        </button>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Quantity *
+            </label>
+            <input
+              type="number"
+              min="1"
+              max={product.quantityInStock}
+              value={quantity}
+              onChange={(e) => setQuantity(e.target.value)}
+              required
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Message (Optional)
+            </label>
+            <textarea
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              rows="3"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500"
+              placeholder="Add any additional information..."
+            />
+          </div>
+
+          <div className="flex gap-3 pt-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 font-medium rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="flex-1 px-4 py-2 bg-gradient-to-r from-teal-600 to-emerald-600 text-white font-medium rounded-lg hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Submitting...
+                </span>
+              ) : (
+                'Submit Offer'
+              )}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -418,11 +289,14 @@ const ProductCard = ({ product, onAddToCart, onToggleWishlist, isInWishlist }) =
 const StorePage = () => {
   const dispatch = useDispatch();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
+  const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showOfferModal, setShowOfferModal] = useState(false);
 
-const isVendorAuthenticated =
-  isAuthenticated && user?.role === 'vendor' && user?.status === 'approved';
+  const isVendorAuthenticated =
+    isAuthenticated && user?.role === 'vendor' && user?.status === 'approved';
 
-const vendorData = user;
+  const vendorData = user;
   const {
     products = [],
     loading = false,
@@ -444,10 +318,6 @@ const vendorData = user;
     inStock: true,
     sort: 'newest'
   });
-
-  // Check if vendor is authenticated
-  // const isVendorAuthenticated = authService.isVendorAuthenticated();
-  // const vendorData = authService.getStoredVendor();
 
   useEffect(() => {
     if (isVendorAuthenticated) {
@@ -472,10 +342,12 @@ const vendorData = user;
   const handleAddToCart = async (productId) => {
     try {
       await dispatch(addToCart({ productId, quantity: 1 })).unwrap();
-      return true; // Return success
+      showSuccessToast('Product added to cart!');
+      return true;
     } catch (error) {
       console.error('Failed to add to cart:', error);
-      throw error; // Throw error to be caught by component
+      showErrorToast('Failed to add to cart');
+      throw error;
     }
   };
 
@@ -483,15 +355,29 @@ const vendorData = user;
     try {
       if (isInWishlist) {
         await dispatch(removeFromWishlist(productId)).unwrap();
+        showInfoToast('Removed from wishlist');
       } else {
         await dispatch(addToWishlist(productId)).unwrap();
+        showSuccessToast('Added to wishlist!');
       }
       dispatch(fetchWishlist());
-      return true; // Return success
+      return true;
     } catch (error) {
       console.error('Failed to toggle wishlist:', error);
-      throw error; // Throw error to be caught by component
+      showErrorToast('Failed to update wishlist');
+      throw error;
     }
+  };
+
+  const handleMakeOffer = (product) => {
+    setSelectedProduct(product);
+    setShowOfferModal(true);
+  };
+
+  const handleSubmitOffer = async (offerData) => {
+    // Here you would dispatch an action to submit the offer
+    console.log('Submitting offer:', offerData);
+    // await dispatch(submitOffer(offerData)).unwrap();
   };
 
   const isInWishlist = (productId) => {
@@ -527,6 +413,47 @@ const vendorData = user;
     }).format(price || 0);
   };
 
+  const formatDate = (date) => {
+    if (!date) return "N/A";
+
+    try {
+      const parsed = new Date(date);
+      if (isNaN(parsed.getTime())) return "N/A";
+
+      return parsed.toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      });
+    } catch {
+      return "N/A";
+    }
+  };
+
+  const getPackCondition = (condition) => {
+    if (!condition) return 'N/A';
+    // Split by slash and display both parts
+    const parts = condition.split('/');
+    if (parts.length > 1) {
+      return (
+        <div className="text-xs">
+          <span className="block text-green-600">{parts[0]}</span>
+          <span className="block text-red-600 text-xs">{parts[1]}</span>
+        </div>
+      );
+    }
+    return condition;
+  };
+
+  const getPackSize = (product) => {
+    if (product.originalPackSize !== undefined && product.originalPackSize !== null)
+      return product.originalPackSize;
+
+    if (product.packQuantity) return product.packQuantity;
+
+    return "N/A";
+  };
+
   // Show access denied if not vendor
   if (!isVendorAuthenticated) {
     return <VendorAccessDenied />;
@@ -535,7 +462,7 @@ const vendorData = user;
   return (
     <div className="min-h-screen bg-gradient-to-br from-teal-50 via-emerald-50 to-white">
       {/* React Hot Toaster */}
-      <Toaster 
+      <Toaster
         position="top-right"
         toastOptions={{
           duration: 4000,
@@ -548,7 +475,18 @@ const vendorData = user;
         }}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Make Offer Modal */}
+      <MakeOfferModal
+        isOpen={showOfferModal}
+        onClose={() => {
+          setShowOfferModal(false);
+          setSelectedProduct(null);
+        }}
+        product={selectedProduct}
+        onSubmit={handleSubmitOffer}
+      />
+
+      <div className="px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
           {/* Store Header */}
           <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl p-8">
@@ -577,15 +515,35 @@ const vendorData = user;
             </div>
           </div>
 
-          {/* Filters Toggle */}
+          {/* Filters and View Toggle */}
           <div className="flex items-center justify-between bg-white/80 backdrop-blur-sm rounded-2xl p-6 shadow-lg">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl hover:from-teal-700 hover:to-emerald-700 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              <Filter className="w-5 h-5 mr-3" />
-              {showFilters ? 'Hide Filters' : 'Show Filters'}
-            </button>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className="inline-flex items-center px-6 py-3 bg-gradient-to-r from-teal-600 to-emerald-600 text-white rounded-xl hover:from-teal-700 hover:to-emerald-700 transform hover:scale-105 transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                <Filter className="w-5 h-5 mr-3" />
+                {showFilters ? 'Hide Filters' : 'Show Filters'}
+              </button>
+
+              {/* View Toggle */}
+              <div className="flex items-center bg-gray-100 rounded-xl p-1">
+                <button
+                  onClick={() => setViewMode('table')}
+                  className={`p-2 rounded-lg transition-all duration-300 ${viewMode === 'table' ? 'bg-white shadow-md text-teal-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  title="Table View"
+                >
+                  <TableIcon className="w-5 h-5" />
+                </button>
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-lg transition-all duration-300 ${viewMode === 'grid' ? 'bg-white shadow-md text-teal-600' : 'text-gray-500 hover:text-gray-700'}`}
+                  title="Grid View"
+                >
+                  <Grid className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
 
             <div className="flex items-center space-x-6">
               <span className="text-lg font-medium text-gray-700">
@@ -664,6 +622,16 @@ const vendorData = user;
                     <span className="ml-3 text-sm font-medium text-gray-700">In Stock Only</span>
                   </label>
 
+                  <label className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={filters.fridgeProducts}
+                      onChange={(e) => updateFilter('fridgeProducts', e.target.checked)}
+                      className="h-5 w-5 text-teal-600 rounded focus:ring-teal-500"
+                    />
+                    <span className="ml-3 text-sm font-medium text-gray-700">Fridge Products</span>
+                  </label>
+
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-3">Sort By</label>
                     <select
@@ -681,11 +649,11 @@ const vendorData = user;
             </div>
           )}
 
-          {/* Main Products Grid */}
+          {/* Main Products Display */}
           <div>
             <div className="flex items-center justify-between mb-8">
               <h2 className="text-3xl font-bold bg-gradient-to-r from-teal-600 to-emerald-600 bg-clip-text text-transparent">
-                All Products
+                {viewMode === 'table' ? 'Products Table' : 'Products Grid'}
               </h2>
               <div className="flex items-center gap-4">
                 <span className="text-sm text-gray-600">
@@ -710,20 +678,243 @@ const vendorData = user;
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                  {products.map((product) => {
-                    const inWishlist = isInWishlist(product._id)
-                    return (
-                      <ProductCard
-                        key={product._id}
-                        product={product}
-                        onAddToCart={() => handleAddToCart(product._id)}
-                        onToggleWishlist={() => handleToggleWishlist(product._id, inWishlist)}
-                        isInWishlist={inWishlist}
-                      />
-                    )
-                  })}
-                </div>
+                {viewMode === 'table' ? (
+                  /* Table View with Correct Field Names */
+                  <div className="bg-white/90 backdrop-blur-sm rounded-3xl shadow-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gradient-to-r from-teal-600 to-emerald-600">
+                          <tr>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Image</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Name</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">NDC</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Pack Condition</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Manufacturer</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Dose Form</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Strength</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Exp. Date</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Pack Size</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Fridge</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Price</th>
+                            <th className="px-6 py-4 text-left text-xs font-medium text-white uppercase tracking-wider">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {products.map((product) => {
+                            const inWishlist = isInWishlist(product._id);
+                            return (
+                              <tr key={product._id} className="hover:bg-gray-50 transition-colors">
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <div className="w-12 h-12 bg-gradient-to-br from-teal-50 to-emerald-50 rounded-lg overflow-hidden">
+                                    {product.image?.url ? (
+                                      <img
+                                        src={product.image.url}
+                                        alt={product.productName}
+                                        className="w-full h-full object-contain p-1"
+                                        onError={(e) => {
+                                          e.target.onerror = null;
+                                          e.target.src = '';
+                                        }}
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <Pill className="w-6 h-6 text-teal-400" />
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm font-medium text-gray-900">{product.productName}</div>
+                                  <div className="text-xs text-gray-500">Lot: {product.lotNumber || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500 font-mono">{product.ndcNumber || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500">
+                                    {product.packageCondition ? (
+                                      <div>
+                                        {product.packageCondition ? (
+                                          product.packageCondition.includes("/") ? (
+                                            <>
+                                              <span className="block text-green-600 text-xs">
+                                                {product.packageCondition.split("/")[0]}
+                                              </span>
+                                              <span className="block text-red-600 text-xs">
+                                                {product.packageCondition.split("/")[1]}
+                                              </span>
+                                            </>
+                                          ) : (
+                                            product.packageCondition
+                                          )
+                                        ) : "N/A"}
+                                      </div>
+                                    ) : 'N/A'}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500">{product.manufacturer || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500">{product.dosageForm || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500">{product.strength || 'N/A'}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500">{formatDate(product.expirationDate)}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm text-gray-500">
+                                    {product.originalPackSize || product.packQuantity || 'N/A'}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm">
+                                    {product.isFridgeProduct === 'Yes' ? (
+                                      <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                        <Thermometer className="w-3 h-3 mr-1" />
+                                        Fridge
+                                      </span>
+                                    ) : (
+                                      <span className="text-gray-400 text-xs">No</span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="text-sm font-semibold text-teal-600">{formatPrice(product.price)}</div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center space-x-2">
+                                    <button
+                                      onClick={() => handleAddToCart(product._id)}
+                                      disabled={product.quantityInStock <= 0}
+                                      className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-110 ${product.quantityInStock <= 0
+                                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'bg-teal-100 text-teal-600 hover:bg-teal-200'
+                                        }`}
+                                      title="Add to Cart"
+                                    >
+                                      <ShoppingCart className="w-4 h-4" />
+                                    </button>
+                                    <button
+                                      onClick={() => handleToggleWishlist(product._id, inWishlist)}
+                                      className={`p-2 rounded-lg transition-all duration-300 transform hover:scale-110 ${inWishlist
+                                          ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                                          : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                        }`}
+                                      title={inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                                    >
+                                      <Heart className={`w-4 h-4 ${inWishlist ? 'fill-current' : ''}`} />
+                                    </button>
+                                    <button
+                                      onClick={() => handleMakeOffer(product)}
+                                      disabled={product.quantityInStock <= 0}
+                                      className={`px-3 py-2 rounded-lg text-xs font-medium transition-all duration-300 transform hover:scale-105 ${product.quantityInStock <= 0
+                                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                          : 'bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-700 hover:to-emerald-700'
+                                        }`}
+                                      title="Make an Offer"
+                                    >
+                                      Offer
+                                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ) : (
+                  /* Grid View with Updated Field Names */
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                    {products.map((product) => {
+                      const inWishlist = isInWishlist(product._id);
+                      return (
+                        <div key={product._id} className="bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 overflow-hidden group transform hover:-translate-y-2">
+                          {/* Image section */}
+                          <div className="relative h-48 bg-gradient-to-br from-teal-50 to-emerald-50 overflow-hidden">
+                            {product.image?.url ? (
+                              <img
+                                src={product.image.url}
+                                alt={product.productName}
+                                className="w-full h-full object-contain p-4 transition-transform duration-500 group-hover:scale-110"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center">
+                                <Pill className="h-16 w-16 text-teal-400" />
+                              </div>
+                            )}
+
+                            {/* Fridge Badge */}
+                            {product.isFridgeProduct === 'Yes' && (
+                              <div className="absolute top-2 left-2">
+                                <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-800 rounded-full text-xs">
+                                  <Thermometer className="w-3 h-3 mr-1" />
+                                  Fridge
+                                </span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Product details */}
+                          <div className="p-4">
+                            <h3 className="font-bold text-gray-900 mb-1">{product.productName}</h3>
+                            <p className="text-xs text-gray-500 font-mono mb-1">NDC: {product.ndcNumber || 'N/A'}</p>
+                            <p className="text-xs text-gray-500 mb-2">Lot: {product.lotNumber || 'N/A'}</p>
+
+                            <div className="space-y-1 mb-3">
+                              <p className="text-xs text-gray-600">Manufacturer: {product.manufacturer || 'N/A'}</p>
+                              <p className="text-xs text-gray-600">Strength: {product.strength || 'N/A'}</p>
+                              <p className="text-xs text-gray-600">Expiry: {formatDate(product.expirationDate)}</p>
+                              <p className="text-xs text-gray-600">
+                                Pack Condition: {product.packageCondition ? (
+                                  <span className="text-green-600">{product.packageCondition.split('/')[0]}</span>
+                                ) : 'N/A'}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-3">
+                              <span className="text-lg font-bold text-teal-600">{formatPrice(product.price)}</span>
+                              <span className="text-xs text-gray-500">Pack: {product.originalPackSize || product.packQuantity || 'N/A'}</span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleAddToCart(product._id)}
+                                disabled={product.quantityInStock <= 0}
+                                className="flex-1 p-2 bg-teal-100 text-teal-600 rounded-lg hover:bg-teal-200 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Add to Cart"
+                              >
+                                <ShoppingCart className="w-4 h-4 mx-auto" />
+                              </button>
+                              <button
+                                onClick={() => handleToggleWishlist(product._id, inWishlist)}
+                                className={`p-2 rounded-lg transition-colors ${inWishlist
+                                    ? 'bg-red-100 text-red-600'
+                                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                                  }`}
+                                title={inWishlist ? 'Remove from Wishlist' : 'Add to Wishlist'}
+                              >
+                                <Heart className={`w-4 h-4 ${inWishlist ? 'fill-current' : ''}`} />
+                              </button>
+                              <button
+                                onClick={() => handleMakeOffer(product)}
+                                disabled={product.quantityInStock <= 0}
+                                className="flex-1 px-2 py-1 bg-gradient-to-r from-teal-600 to-emerald-600 text-white text-xs rounded-lg hover:from-teal-700 hover:to-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Make Offer
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 {products.length === 0 && (
                   <div className="text-center py-20">
@@ -754,15 +945,15 @@ const vendorData = user;
                       </button>
 
                       {[...Array(Math.min(5, pagination.pages))].map((_, i) => {
-                        let pageNum
+                        let pageNum;
                         if (pagination.pages <= 5) {
-                          pageNum = i + 1
+                          pageNum = i + 1;
                         } else if (pagination.page <= 3) {
-                          pageNum = i + 1
+                          pageNum = i + 1;
                         } else if (pagination.page >= pagination.pages - 2) {
-                          pageNum = pagination.pages - 4 + i
+                          pageNum = pagination.pages - 4 + i;
                         } else {
-                          pageNum = pagination.page - 2 + i
+                          pageNum = pagination.page - 2 + i;
                         }
 
                         return (
@@ -776,7 +967,7 @@ const vendorData = user;
                           >
                             {pageNum}
                           </button>
-                        )
+                        );
                       })}
 
                       <button

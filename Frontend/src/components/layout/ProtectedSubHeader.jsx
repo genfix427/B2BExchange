@@ -139,46 +139,6 @@ const ProtectedSubHeader = () => {
                 </span>
               )}
             </button>
-
-            {/* User Menu */}
-            <div className="relative group">
-              <button className="flex items-center space-x-2 text-sm hover:text-gray-300">
-                <User className="w-5 h-5" />
-                <span className="truncate max-w-xs">
-                  {user.pharmacyInfo?.legalBusinessName || user.email}
-                </span>
-              </button>
-              
-              <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-50 hidden group-hover:block">
-                <Link
-                  to="/vendor/profile"
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Profile Settings
-                </Link>
-                <Link
-                  to="/store/orders"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  My Purchases
-                </Link>
-                <Link
-                  to="/vendor/orders"
-                  className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                >
-                  Sales Orders
-                </Link>
-                <Link
-                  to="/login"
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  onClick={handleLogout}
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
-                </Link>
-              </div>
-            </div>
           </div>
         </div>
       </div>

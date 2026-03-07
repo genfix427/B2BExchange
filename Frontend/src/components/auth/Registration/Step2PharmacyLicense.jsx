@@ -4,7 +4,7 @@ import { useSelector, useDispatch } from 'react-redux'
 import { updateFormData, nextStep, prevStep } from '../../../store/slices/registrationSlice'
 import { Calendar } from 'lucide-react'
 
-const Step4PharmacyLicense = () => {
+const Step2PharmacyLicense = () => {
   const dispatch = useDispatch()
   const { formData } = useSelector((state) => state.registration)
   
@@ -27,7 +27,7 @@ const Step4PharmacyLicense = () => {
     }
     
     dispatch(updateFormData({
-      step: 4,
+      step: 2,
       data: licenseData
     }))
     dispatch(nextStep())
@@ -41,7 +41,7 @@ const Step4PharmacyLicense = () => {
   
   return (
     <div className="max-w-2xl mx-auto">
-      <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 4: Pharmacy License Information</h2>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Step 2: Pharmacy License Information</h2>
       <p className="text-sm text-gray-600 mb-6">
         Provide your pharmacy's licensing information. All licenses must be current and valid.
       </p>
@@ -163,7 +163,7 @@ const Step4PharmacyLicense = () => {
             type="submit"
             className="px-6 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            Next: Pharmacy Questions
+            Next: Pharmacy Owner
           </button>
         </div>
       </form>
@@ -171,4 +171,4 @@ const Step4PharmacyLicense = () => {
   )
 }
 
-export default Step4PharmacyLicense
+export default Step2PharmacyLicense

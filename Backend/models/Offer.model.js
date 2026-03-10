@@ -1,178 +1,168 @@
-// models/Offer.model.js
+// backend/models/Offer.model.js
 import mongoose from 'mongoose';
 
+const offerHistorySchema = new mongoose.Schema({
+  action: {
+    type: String,
+    enum: ['created', 'countered', 'accepted', 'rejected', 'expired', 'cancelled'],
+    required: true
+  },
+  performedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    required: true
+  },
+  performedByRole: {
+    type: String,
+    enum: ['buyer', 'seller'],
+    required: true
+  },
+  price: Number,
+  message: String,
+  timestamp: {
+    type: Date,
+    default: Date.now
+  }
+});
+
 const offerSchema = new mongoose.Schema({
+  // Buyer (the vendor making the offer)
+  buyer: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    required: true
+  },
+
+  // Seller (the vendor who owns the product)
+  seller: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Vendor',
+    required: true
+  },
+
   // Product being offered on
   product: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Product',
     required: true
   },
+
+  // Snapshot of product info at time of offer
   productName: {
     type: String,
     required: true
   },
-  productNDC: {
+  ndcNumber: {
     type: String
   },
-  productImage: {
-    url: String,
-    publicId: String
+  manufacturer: {
+    type: String
   },
-  originalPrice: {
-    type: Number,
-    required: true
-  },
-
-  // Buyer vendor (the one making the offer)
-  buyerVendor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Vendor',
-    required: true
-  },
-  buyerVendorName: {
-    type: String,
-    required: true
+  productSnapshot: {
+    dosageForm: String,
+    strength: String,
+    packSize: String,
+    lotNumber: String,
+    expirationDate: Date,
+    manufacturer: String,
+    image: {
+      url: String,
+      publicId: String
+    }
   },
 
-  // Seller vendor (the one who owns the product)
-  sellerVendor: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Vendor',
-    required: true
-  },
-  sellerVendorName: {
-    type: String,
-    required: true
-  },
-
-  // Offer details
-  offerPrice: {
-    type: Number,
-    required: true,
-    min: 0.01
-  },
+  // Quantity requested
   quantity: {
     type: Number,
     required: true,
     min: 1
   },
-  message: {
-    type: String,
-    maxlength: 500,
-    default: ''
+
+  // Original listing price per unit
+  originalPrice: {
+    type: Number,
+    required: true,
+    min: 0.01
   },
 
-  // Counter offer details
+  // Buyer's offered price per unit
+  offeredPrice: {
+    type: Number,
+    required: true,
+    min: 0.01
+  },
+
+  // Seller's counter price per unit
   counterPrice: {
     type: Number,
-    default: null
-  },
-  counterMessage: {
-    type: String,
-    maxlength: 500,
-    default: ''
-  },
-  counteredAt: {
-    type: Date,
-    default: null
+    min: 0.01
   },
 
-  // Status tracking
+  // Final agreed price per unit (set on acceptance)
+  finalPrice: {
+    type: Number,
+    min: 0.01
+  },
+
+  // Offer status
   status: {
     type: String,
-    enum: ['pending', 'accepted', 'rejected', 'countered', 'counter_accepted', 'counter_rejected', 'expired', 'cancelled'],
+    enum: ['pending', 'countered', 'accepted', 'rejected', 'expired', 'cancelled'],
     default: 'pending'
   },
 
-  // Rejection reason
+  // Messages
+  message: {
+    type: String,
+    maxlength: 500
+  },
+  counterMessage: {
+    type: String,
+    maxlength: 500
+  },
   rejectionReason: {
     type: String,
-    default: ''
+    maxlength: 500
   },
 
-  // Converted order reference
-  convertedOrder: {
+  // Tracking
+  acceptedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Order',
-    default: null
+    ref: 'Vendor'
   },
-  offerReference: {
+  acceptedAt: Date,
+
+  rejectedBy: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Offer',
-    default: null
+    ref: 'Vendor'
   },
-  isFromOffer: {
-    type: Boolean,
-    default: false
+  rejectedAt: Date,
+
+  counteredAt: Date,
+
+  // Link to resulting order
+  resultingOrder: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Order'
   },
 
-  // Timestamps for status changes
-  acceptedAt: {
-    type: Date,
-    default: null
-  },
-  rejectedAt: {
-    type: Date,
-    default: null
-  },
-  cancelledAt: {
-    type: Date,
-    default: null
-  },
+  // History of all actions
+  history: [offerHistorySchema],
 
-  // Expiration (offers expire after 7 days)
+  // Expiry (default 7 days)
   expiresAt: {
     type: Date,
-    default: function() {
-      return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
-    }
-  },
-
-  // Product snapshot at time of offer
-  productSnapshot: {
-    strength: String,
-    dosageForm: String,
-    manufacturer: String,
-    packSize: String,
-    lotNumber: String,
-    expirationDate: Date,
-    packageCondition: String
+    default: () => new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
   }
 }, {
   timestamps: true
 });
 
-// Indexes for performance
-offerSchema.index({ buyerVendor: 1, status: 1, createdAt: -1 });
-offerSchema.index({ sellerVendor: 1, status: 1, createdAt: -1 });
+// Indexes
+offerSchema.index({ buyer: 1, status: 1 });
+offerSchema.index({ seller: 1, status: 1 });
 offerSchema.index({ product: 1 });
-offerSchema.index({ expiresAt: 1 });
-offerSchema.index({ status: 1 });
-
-// Virtual for total offer value
-offerSchema.virtual('totalOfferValue').get(function() {
-  return this.offerPrice * this.quantity;
-});
-
-// Virtual for total counter value
-offerSchema.virtual('totalCounterValue').get(function() {
-  if (!this.counterPrice) return null;
-  return this.counterPrice * this.quantity;
-});
-
-// Check if offer is expired
-offerSchema.methods.isExpired = function() {
-  return new Date() > this.expiresAt;
-};
-
-// Auto-expire check
-offerSchema.pre('find', function() {
-  // This middleware doesn't auto-update, we'll handle expiration in controller
-});
-
-offerSchema.set('toJSON', { virtuals: true });
-offerSchema.set('toObject', { virtuals: true });
+offerSchema.index({ status: 1, createdAt: -1 });
 
 const Offer = mongoose.model('Offer', offerSchema);
 export default Offer;

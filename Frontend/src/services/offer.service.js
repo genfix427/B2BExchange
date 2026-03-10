@@ -4,7 +4,14 @@ import { api } from './api';
 export const offerService = {
   // Create a new offer
   createOffer(data) {
-    return api.post('/vendor/offers', data);
+    // Transform frontend field names to backend expectations
+    const transformedData = {
+      productId: data.productId,
+      quantity: data.quantity,
+      offeredPrice: data.offerPrice, // Map offerPrice to offeredPrice
+      message: data.message
+    };
+    return api.post('/vendor/offers', transformedData);
   },
 
   // Get received offers (as seller)
@@ -30,38 +37,31 @@ export const offerService = {
     return api.get(`/vendor/offers/${offerId}`);
   },
 
-  // Get offer counts (for badges)
-  getOfferCounts() {
-    return api.get('/vendor/offers/counts');
+  // Get offer stats
+  getOfferStats() {
+    return api.get('/vendor/offers/stats');
   },
 
-  // Accept offer (seller)
+  // Accept offer (seller accepts buyer's offer OR buyer accepts seller's counter)
   acceptOffer(offerId) {
     return api.put(`/vendor/offers/${offerId}/accept`);
   },
 
-  // Reject offer (seller)
+  // Reject offer (seller or buyer)
   rejectOffer(offerId, reason = '') {
     return api.put(`/vendor/offers/${offerId}/reject`, { reason });
   },
 
-  // Counter offer (seller)
+  // Counter offer (seller only)
   counterOffer(offerId, data) {
-    return api.put(`/vendor/offers/${offerId}/counter`, data);
+    return api.put(`/vendor/offers/${offerId}/counter`, {
+      counterPrice: data.counterPrice,
+      message: data.counterMessage
+    });
   },
 
-  // Accept counter offer (buyer)
-  acceptCounterOffer(offerId) {
-    return api.put(`/vendor/offers/${offerId}/accept-counter`);
-  },
-
-  // Reject counter offer (buyer)
-  rejectCounterOffer(offerId) {
-    return api.put(`/vendor/offers/${offerId}/reject-counter`);
-  },
-
-  // Cancel offer (buyer)
+  // Cancel offer (buyer only)
   cancelOffer(offerId) {
-    return api.put(`/vendor/offers/${offerId}/cancel`);
+    return api.put(`/vendor/offers/${offerId}/reject`); // reject endpoint handles cancellation
   }
 };

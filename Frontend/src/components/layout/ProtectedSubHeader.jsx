@@ -30,7 +30,7 @@ import {
   selectWishlistCount
 } from '../../store/slices/storeSlice'
 import {
-  fetchOfferCounts,
+  fetchOfferStats,
   selectOfferCounts
 } from '../../store/slices/offerSlice'
 import {
@@ -62,7 +62,7 @@ const ProtectedSubHeader = () => {
     if (user) {
       dispatch(fetchCart())
       dispatch(fetchWishlist())
-      dispatch(fetchOfferCounts())
+      dispatch(fetchOfferStats())
       dispatch(fetchUnreadCount())
     }
   }, [dispatch, user, location.pathname])
@@ -73,7 +73,7 @@ const ProtectedSubHeader = () => {
 
     const interval = setInterval(() => {
       dispatch(fetchUnreadCount())
-      dispatch(fetchOfferCounts())
+      dispatch(fetchOfferStats())
     }, 30000)
 
     return () => clearInterval(interval)

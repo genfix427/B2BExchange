@@ -1,7 +1,7 @@
 // src/pages/vendor/ReceivedOffersPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import {
   Gift,
@@ -20,14 +20,21 @@ import {
   MessageSquare,
   ChevronDown,
   ChevronUp,
-  ShoppingBag
+  ShoppingBag,
+  Calendar,
+  Building2,
+  FlaskConical,
+  BoxSelect,
+  Layers,
+  Hash,
+  Thermometer
 } from 'lucide-react';
 import {
   fetchReceivedOffers,
   acceptOffer,
   rejectOffer,
   counterOffer,
-  fetchOfferCounts,
+  fetchOfferStats,
   clearOfferError,
   clearSuccessMessage
 } from '../../store/slices/offerSlice';
@@ -39,7 +46,7 @@ const CounterOfferModal = ({ isOpen, onClose, offer, onSubmit, isSubmitting }) =
 
   useEffect(() => {
     if (isOpen && offer) {
-      setCounterPrice('');
+      setCounterPrice(offer.offerPrice?.toString() || '');
       setCounterMessage('');
     }
   }, [isOpen, offer?._id]);
@@ -237,8 +244,24 @@ const RejectOfferModal = ({ isOpen, onClose, offer, onSubmit, isSubmitting }) =>
   );
 };
 
+// Detail Card Component
+const DetailCard = ({ icon, label, value }) => (
+  <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+    <div className="flex items-center gap-2 mb-1">
+      {icon}
+      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+        {label}
+      </span>
+    </div>
+    <p className="text-sm font-medium text-gray-800 truncate" title={value}>
+      {value != null && value !== '' ? value : <span className="text-gray-400">N/A</span>}
+    </p>
+  </div>
+);
+
 const ReceivedOffersPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const {
     receivedOffers,
     receivedPagination,
@@ -255,26 +278,46 @@ const ReceivedOffersPage = () => {
   const [rejectModalOffer, setRejectModalOffer] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchReceivedOffers({ page: 1, limit: 10, status: statusFilter === 'all' ? '' : statusFilter }));
+    dispatch(fetchReceivedOffers({ 
+      page: 1, 
+      limit: 10, 
+      status: statusFilter === 'all' ? '' : statusFilter 
+    }));
   }, [dispatch, statusFilter]);
 
   useEffect(() => {
     if (successMessage) {
       toast.success(successMessage, {
         duration: 4000,
-        style: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px' }
+        style: { 
+          background: '#f0fdf4', 
+          color: '#166534', 
+          border: '1px solid #bbf7d0', 
+          borderRadius: '12px', 
+          padding: '16px' 
+        }
       });
       dispatch(clearSuccessMessage());
-      dispatch(fetchReceivedOffers({ page: 1, limit: 10, status: statusFilter === 'all' ? '' : statusFilter }));
-      dispatch(fetchOfferCounts());
+      dispatch(fetchReceivedOffers({ 
+        page: receivedPagination.page, 
+        limit: 10, 
+        status: statusFilter === 'all' ? '' : statusFilter 
+      }));
+      dispatch(fetchOfferStats());
     }
-  }, [successMessage, dispatch, statusFilter]);
+  }, [successMessage, dispatch, statusFilter, receivedPagination.page]);
 
   useEffect(() => {
     if (actionError) {
       toast.error(actionError, {
         duration: 4000,
-        style: { background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px' }
+        style: { 
+          background: '#fef2f2', 
+          color: '#dc2626', 
+          border: '1px solid #fecaca', 
+          borderRadius: '12px', 
+          padding: '16px' 
+        }
       });
       dispatch(clearOfferError());
     }
@@ -297,7 +340,11 @@ const ReceivedOffersPage = () => {
   };
 
   const handlePageChange = (page) => {
-    dispatch(fetchReceivedOffers({ page, limit: 10, status: statusFilter === 'all' ? '' : statusFilter }));
+    dispatch(fetchReceivedOffers({ 
+      page, 
+      limit: 10, 
+      status: statusFilter === 'all' ? '' : statusFilter 
+    }));
   };
 
   const getStatusBadge = (status) => {
@@ -306,8 +353,6 @@ const ReceivedOffersPage = () => {
       accepted: 'bg-green-100 text-green-800 border-green-200',
       rejected: 'bg-red-100 text-red-800 border-red-200',
       countered: 'bg-orange-100 text-orange-800 border-orange-200',
-      counter_accepted: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      counter_rejected: 'bg-rose-100 text-rose-800 border-rose-200',
       expired: 'bg-gray-100 text-gray-800 border-gray-200',
       cancelled: 'bg-gray-100 text-gray-600 border-gray-200'
     };
@@ -317,8 +362,16 @@ const ReceivedOffersPage = () => {
   const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit'
     });
+  };
+
+  const viewOrder = (orderId) => {
+    navigate(`/vendor/orders/${orderId}`);
   };
 
   return (
@@ -364,7 +417,7 @@ const ReceivedOffersPage = () => {
 
             {/* Status Filter */}
             <div className="flex items-center gap-2 flex-wrap">
-              {['all', 'pending', 'accepted', 'rejected', 'countered', 'expired'].map((s) => (
+              {['all', 'pending', 'countered', 'accepted', 'rejected', 'expired'].map((s) => (
                 <button
                   key={s}
                   onClick={() => setStatusFilter(s)}
@@ -401,15 +454,13 @@ const ReceivedOffersPage = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-teal-600 to-emerald-600">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Image</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Product</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">NDC</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Buyer</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Offer</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Original Price</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Counter</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Original</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Qty</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Dose Form</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Strength</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Date</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Actions</th>
@@ -420,31 +471,39 @@ const ReceivedOffersPage = () => {
                     <React.Fragment key={offer._id}>
                       <tr className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="w-10 h-10 bg-teal-50 rounded-lg overflow-hidden">
-                            {offer.productImage?.url ? (
-                              <img src={offer.productImage.url} alt="" className="w-full h-full object-contain p-0.5" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Pill className="w-5 h-5 text-teal-400" />
-                              </div>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-teal-50 rounded-lg overflow-hidden flex-shrink-0">
+                              {offer.productImage?.url ? (
+                                <img 
+                                  src={offer.productImage.url} 
+                                  alt="" 
+                                  className="w-full h-full object-contain p-0.5"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Pill className="w-4 h-4 text-teal-400" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-sm font-medium text-gray-900 max-w-[150px] truncate">
+                              {offer.productName}
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900 max-w-[150px] truncate">{offer.productName}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-gray-500 font-mono">{offer.productNDC || 'N/A'}</div>
+                          <div className="text-xs text-gray-500 font-mono">{offer.ndcNumber || 'N/A'}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm text-gray-700 max-w-[120px] truncate">{offer.buyerVendorName}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm font-bold text-blue-600">${offer.offerPrice?.toFixed(2)}</div>
-                          {offer.counterPrice && (
-                            <div className="text-xs text-orange-600 font-medium">
-                              Counter: ${offer.counterPrice.toFixed(2)}
-                            </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {offer.counterPrice ? (
+                            <div className="text-sm font-bold text-orange-600">${offer.counterPrice.toFixed(2)}</div>
+                          ) : (
+                            <span className="text-xs text-gray-400">—</span>
                           )}
                         </td>
                         <td className="px-4 py-3">
@@ -452,12 +511,6 @@ const ReceivedOffersPage = () => {
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm text-gray-700">{offer.quantity}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-gray-500">{offer.productSnapshot?.dosageForm || 'N/A'}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-gray-500">{offer.productSnapshot?.strength || 'N/A'}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-xs text-gray-500">{formatDate(offer.createdAt)}</div>
@@ -497,6 +550,38 @@ const ReceivedOffersPage = () => {
                                 </button>
                               </>
                             )}
+                            
+                            {offer.status === 'countered' && (
+                              <>
+                                <button
+                                  onClick={() => handleAcceptOffer(offer._id)}
+                                  disabled={actionLoading}
+                                  className="p-1.5 bg-green-100 text-green-600 rounded-lg hover:bg-green-200 transition-colors disabled:opacity-50"
+                                  title="Accept Counter Offer"
+                                >
+                                  <Check className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => setRejectModalOffer(offer)}
+                                  disabled={actionLoading}
+                                  className="p-1.5 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors disabled:opacity-50"
+                                  title="Reject Counter Offer"
+                                >
+                                  <X className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+
+                            {(offer.status === 'accepted') && offer.resultingOrder && (
+                              <button
+                                onClick={() => viewOrder(offer.resultingOrder._id)}
+                                className="p-1.5 bg-teal-100 text-teal-600 rounded-lg hover:bg-teal-200 transition-colors"
+                                title="View Order"
+                              >
+                                <ShoppingBag className="w-4 h-4" />
+                              </button>
+                            )}
+
                             <button
                               onClick={() => setExpandedOffer(expandedOffer === offer._id ? null : offer._id)}
                               className="p-1.5 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
@@ -515,75 +600,126 @@ const ReceivedOffersPage = () => {
                       {/* Expanded Details Row */}
                       {expandedOffer === offer._id && (
                         <tr>
-                          <td colSpan="12" className="px-4 py-4 bg-gray-50">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="bg-white rounded-xl p-4 border">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Offer Details</h4>
-                                <div className="space-y-1 text-sm">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Offer Price:</span>
-                                    <span className="font-medium">${offer.offerPrice?.toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Total Value:</span>
-                                    <span className="font-bold text-teal-600">${(offer.offerPrice * offer.quantity).toFixed(2)}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Discount:</span>
-                                    <span className="text-green-600">
-                                      {(((offer.originalPrice - offer.offerPrice) / offer.originalPrice) * 100).toFixed(1)}%
-                                    </span>
-                                  </div>
+                          <td colSpan="10" className="px-4 py-4 bg-gray-50">
+                            <div className="space-y-4">
+                              {/* Messages Section */}
+                              {(offer.message || offer.counterMessage || offer.rejectionReason) && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  {offer.message && (
+                                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MessageSquare className="w-4 h-4 text-blue-500" />
+                                        <h4 className="text-sm font-semibold text-blue-700">Buyer's Message</h4>
+                                      </div>
+                                      <p className="text-sm text-blue-800">{offer.message}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {offer.counterMessage && (
+                                    <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MessageSquare className="w-4 h-4 text-orange-500" />
+                                        <h4 className="text-sm font-semibold text-orange-700">Your Counter Message</h4>
+                                      </div>
+                                      <p className="text-sm text-orange-800">{offer.counterMessage}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {offer.rejectionReason && (
+                                    <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <AlertCircle className="w-4 h-4 text-red-500" />
+                                        <h4 className="text-sm font-semibold text-red-700">Rejection Reason</h4>
+                                      </div>
+                                      <p className="text-sm text-red-800">{offer.rejectionReason}</p>
+                                    </div>
+                                  )}
                                 </div>
+                              )}
+
+                              {/* Product Details Grid */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                <DetailCard
+                                  icon={<Hash className="w-4 h-4 text-teal-500" />}
+                                  label="NDC Number"
+                                  value={offer.ndcNumber}
+                                />
+                                <DetailCard
+                                  icon={<Building2 className="w-4 h-4 text-purple-500" />}
+                                  label="Manufacturer"
+                                  value={offer.productSnapshot?.manufacturer || offer.manufacturer}
+                                />
+                                <DetailCard
+                                  icon={<FlaskConical className="w-4 h-4 text-indigo-500" />}
+                                  label="Strength"
+                                  value={offer.productSnapshot?.strength}
+                                />
+                                <DetailCard
+                                  icon={<Pill className="w-4 h-4 text-pink-500" />}
+                                  label="Dosage Form"
+                                  value={offer.productSnapshot?.dosageForm}
+                                />
+                                <DetailCard
+                                  icon={<Calendar className="w-4 h-4 text-orange-500" />}
+                                  label="Expiration"
+                                  value={offer.productSnapshot?.expirationDate ? formatDate(offer.productSnapshot.expirationDate) : 'N/A'}
+                                />
+                                <DetailCard
+                                  icon={<BoxSelect className="w-4 h-4 text-emerald-500" />}
+                                  label="Pack Condition"
+                                  value={offer.productSnapshot?.packSize}
+                                />
+                                <DetailCard
+                                  icon={<Layers className="w-4 h-4 text-cyan-500" />}
+                                  label="Pack Size"
+                                  value={offer.productSnapshot?.packSize}
+                                />
+                                <DetailCard
+                                  icon={<Package className="w-4 h-4 text-amber-500" />}
+                                  label="Lot Number"
+                                  value={offer.productSnapshot?.lotNumber}
+                                />
+                                <DetailCard
+                                  icon={<Thermometer className="w-4 h-4 text-blue-500" />}
+                                  label="Fridge"
+                                  value={offer.productSnapshot?.isFridgeProduct === 'Yes' ? 'Yes' : 'No'}
+                                />
                               </div>
 
-                              <div className="bg-white rounded-xl p-4 border">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Product Snapshot</h4>
-                                <div className="space-y-1 text-sm">
-                                  <p className="text-gray-600">Manufacturer: {offer.productSnapshot?.manufacturer || 'N/A'}</p>
-                                  <p className="text-gray-600">Pack Size: {offer.productSnapshot?.packSize || 'N/A'}</p>
-                                  <p className="text-gray-600">Lot: {offer.productSnapshot?.lotNumber || 'N/A'}</p>
-                                  <p className="text-gray-600">
-                                    Expiry: {offer.productSnapshot?.expirationDate
-                                      ? new Date(offer.productSnapshot.expirationDate).toLocaleDateString()
-                                      : 'N/A'}
-                                  </p>
+                              {/* Timeline */}
+                              <div className="bg-white rounded-xl p-4 border border-gray-100">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-gray-500" />
+                                  Timeline
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full" />
+                                    <span className="text-gray-600">Created: {formatDate(offer.createdAt)}</span>
+                                  </div>
+                                  {offer.counteredAt && (
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-2 h-2 bg-orange-500 rounded-full" />
+                                      <span className="text-gray-600">Countered: {formatDate(offer.counteredAt)}</span>
+                                    </div>
+                                  )}
+                                  {offer.acceptedAt && (
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-2 h-2 bg-green-500 rounded-full" />
+                                      <span className="text-gray-600">Accepted: {formatDate(offer.acceptedAt)}</span>
+                                    </div>
+                                  )}
+                                  {offer.rejectedAt && (
+                                    <div className="flex items-center gap-3">
+                                      <div className="w-2 h-2 bg-red-500 rounded-full" />
+                                      <span className="text-gray-600">Rejected: {formatDate(offer.rejectedAt)}</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-2 h-2 bg-gray-400 rounded-full" />
+                                    <span className="text-gray-500">Expires: {formatDate(offer.expiresAt)}</span>
+                                  </div>
                                 </div>
-                              </div>
-
-                              <div className="bg-white rounded-xl p-4 border">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Message & Status</h4>
-                                {offer.message ? (
-                                  <div className="bg-blue-50 rounded-lg p-2 mb-2">
-                                    <p className="text-sm text-blue-800 flex items-start gap-1">
-                                      <MessageSquare className="w-3 h-3 mt-0.5 flex-shrink-0" />
-                                      {offer.message}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-gray-400 mb-2">No message from buyer</p>
-                                )}
-                                {offer.counterPrice && (
-                                  <div className="bg-orange-50 rounded-lg p-2">
-                                    <p className="text-xs text-orange-700">
-                                      Counter: ${offer.counterPrice.toFixed(2)} per unit
-                                    </p>
-                                    {offer.counterMessage && (
-                                      <p className="text-xs text-orange-600 mt-1">{offer.counterMessage}</p>
-                                    )}
-                                  </div>
-                                )}
-                                {offer.convertedOrder && (
-                                  <div className="mt-2 bg-green-50 rounded-lg p-2">
-                                    <p className="text-xs text-green-700 flex items-center gap-1">
-                                      <ShoppingBag className="w-3 h-3" />
-                                      Converted to Order
-                                    </p>
-                                  </div>
-                                )}
-                                <p className="text-xs text-gray-400 mt-2">
-                                  Expires: {formatDate(offer.expiresAt)}
-                                </p>
                               </div>
                             </div>
                           </td>

@@ -1,7 +1,7 @@
 // src/pages/vendor/SentOffersPage.jsx
 import React, { useState, useEffect } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { toast, Toaster } from 'react-hot-toast';
 import {
   ArrowRight,
@@ -18,20 +18,43 @@ import {
   ChevronUp,
   ShoppingBag,
   AlertTriangle,
-  Ban
+  Ban,
+  Calendar,
+  Building2,
+  FlaskConical,
+  BoxSelect,
+  Layers,
+  Hash,
+  Thermometer
 } from 'lucide-react';
 import {
   fetchSentOffers,
-  acceptCounterOffer,
-  rejectCounterOffer,
+  acceptOffer,
+  rejectOffer,
   cancelOffer,
-  fetchOfferCounts,
+  fetchOfferStats,
   clearOfferError,
   clearSuccessMessage
 } from '../../store/slices/offerSlice';
 
+// Detail Card Component
+const DetailCard = ({ icon, label, value }) => (
+  <div className="bg-white rounded-xl p-3 border border-gray-100 shadow-sm">
+    <div className="flex items-center gap-2 mb-1">
+      {icon}
+      <span className="text-[10px] font-semibold text-gray-500 uppercase tracking-wider">
+        {label}
+      </span>
+    </div>
+    <p className="text-sm font-medium text-gray-800 truncate" title={value}>
+      {value != null && value !== '' ? value : <span className="text-gray-400">N/A</span>}
+    </p>
+  </div>
+);
+
 const SentOffersPage = () => {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const {
     sentOffers,
     sentPagination,
@@ -45,26 +68,46 @@ const SentOffersPage = () => {
   const [expandedOffer, setExpandedOffer] = useState(null);
 
   useEffect(() => {
-    dispatch(fetchSentOffers({ page: 1, limit: 10, status: statusFilter === 'all' ? '' : statusFilter }));
+    dispatch(fetchSentOffers({ 
+      page: 1, 
+      limit: 10, 
+      status: statusFilter === 'all' ? '' : statusFilter 
+    }));
   }, [dispatch, statusFilter]);
 
   useEffect(() => {
     if (successMessage) {
       toast.success(successMessage, {
         duration: 4000,
-        style: { background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', borderRadius: '12px', padding: '16px' }
+        style: { 
+          background: '#f0fdf4', 
+          color: '#166534', 
+          border: '1px solid #bbf7d0', 
+          borderRadius: '12px', 
+          padding: '16px' 
+        }
       });
       dispatch(clearSuccessMessage());
-      dispatch(fetchSentOffers({ page: 1, limit: 10, status: statusFilter === 'all' ? '' : statusFilter }));
-      dispatch(fetchOfferCounts());
+      dispatch(fetchSentOffers({ 
+        page: sentPagination.page, 
+        limit: 10, 
+        status: statusFilter === 'all' ? '' : statusFilter 
+      }));
+      dispatch(fetchOfferStats());
     }
-  }, [successMessage, dispatch, statusFilter]);
+  }, [successMessage, dispatch, statusFilter, sentPagination.page]);
 
   useEffect(() => {
     if (actionError) {
       toast.error(actionError, {
         duration: 4000,
-        style: { background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca', borderRadius: '12px', padding: '16px' }
+        style: { 
+          background: '#fef2f2', 
+          color: '#dc2626', 
+          border: '1px solid #fecaca', 
+          borderRadius: '12px', 
+          padding: '16px' 
+        }
       });
       dispatch(clearOfferError());
     }
@@ -72,13 +115,13 @@ const SentOffersPage = () => {
 
   const handleAcceptCounter = async (offerId) => {
     if (window.confirm('Accept this counter offer? An order will be created automatically.')) {
-      dispatch(acceptCounterOffer(offerId));
+      dispatch(acceptOffer(offerId));
     }
   };
 
-  const handleRejectCounter = async (offerId) => {
+  const handleRejectCounter = async (offerId, reason = '') => {
     if (window.confirm('Reject this counter offer?')) {
-      dispatch(rejectCounterOffer(offerId));
+      dispatch(rejectOffer({ offerId, reason }));
     }
   };
 
@@ -89,7 +132,11 @@ const SentOffersPage = () => {
   };
 
   const handlePageChange = (page) => {
-    dispatch(fetchSentOffers({ page, limit: 10, status: statusFilter === 'all' ? '' : statusFilter }));
+    dispatch(fetchSentOffers({ 
+      page, 
+      limit: 10, 
+      status: statusFilter === 'all' ? '' : statusFilter 
+    }));
   };
 
   const getStatusBadge = (status) => {
@@ -98,8 +145,6 @@ const SentOffersPage = () => {
       accepted: 'bg-green-100 text-green-800 border-green-200',
       rejected: 'bg-red-100 text-red-800 border-red-200',
       countered: 'bg-orange-100 text-orange-800 border-orange-200',
-      counter_accepted: 'bg-emerald-100 text-emerald-800 border-emerald-200',
-      counter_rejected: 'bg-rose-100 text-rose-800 border-rose-200',
       expired: 'bg-gray-100 text-gray-800 border-gray-200',
       cancelled: 'bg-gray-100 text-gray-600 border-gray-200'
     };
@@ -109,8 +154,16 @@ const SentOffersPage = () => {
   const formatDate = (date) => {
     if (!date) return 'N/A';
     return new Date(date).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric', 
+      hour: '2-digit', 
+      minute: '2-digit'
     });
+  };
+
+  const viewOrder = (orderId) => {
+    navigate(`/store/orders`);
   };
 
   return (
@@ -181,7 +234,6 @@ const SentOffersPage = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gradient-to-r from-blue-600 to-indigo-600">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Image</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Product</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">NDC</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">Seller</th>
@@ -199,21 +251,27 @@ const SentOffersPage = () => {
                     <React.Fragment key={offer._id}>
                       <tr className="hover:bg-gray-50 transition-colors">
                         <td className="px-4 py-3">
-                          <div className="w-10 h-10 bg-blue-50 rounded-lg overflow-hidden">
-                            {offer.productImage?.url ? (
-                              <img src={offer.productImage.url} alt="" className="w-full h-full object-contain p-0.5" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center">
-                                <Pill className="w-5 h-5 text-blue-400" />
-                              </div>
-                            )}
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 bg-blue-50 rounded-lg overflow-hidden flex-shrink-0">
+                              {offer.productImage?.url ? (
+                                <img 
+                                  src={offer.productImage.url} 
+                                  alt="" 
+                                  className="w-full h-full object-contain p-0.5"
+                                />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center">
+                                  <Pill className="w-4 h-4 text-blue-400" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-sm font-medium text-gray-900 max-w-[150px] truncate">
+                              {offer.productName}
+                            </div>
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <div className="text-sm font-medium text-gray-900 max-w-[150px] truncate">{offer.productName}</div>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="text-xs text-gray-500 font-mono">{offer.productNDC || 'N/A'}</div>
+                          <div className="text-xs text-gray-500 font-mono">{offer.ndcNumber || 'N/A'}</div>
                         </td>
                         <td className="px-4 py-3">
                           <div className="text-sm text-gray-700 max-w-[120px] truncate">{offer.sellerVendorName}</div>
@@ -279,14 +337,14 @@ const SentOffersPage = () => {
                             )}
 
                             {/* Accepted - Show order link */}
-                            {(offer.status === 'accepted' || offer.status === 'counter_accepted') && offer.convertedOrder && (
-                              <Link
-                                to={`/store/orders`}
+                            {(offer.status === 'accepted') && offer.resultingOrder && (
+                              <button
+                                onClick={() => viewOrder(offer.resultingOrder._id)}
                                 className="p-1.5 bg-teal-100 text-teal-600 rounded-lg hover:bg-teal-200 transition-colors"
                                 title="View Order"
                               >
                                 <ShoppingBag className="w-4 h-4" />
-                              </Link>
+                              </button>
                             )}
 
                             {/* Rejected - Show message */}
@@ -318,97 +376,126 @@ const SentOffersPage = () => {
                       {/* Expanded Details */}
                       {expandedOffer === offer._id && (
                         <tr>
-                          <td colSpan="11" className="px-4 py-4 bg-gray-50">
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="bg-white rounded-xl p-4 border">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Offer Summary</h4>
-                                <div className="space-y-1 text-sm">
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Your Offer:</span>
-                                    <span className="font-medium">${offer.offerPrice?.toFixed(2)} × {offer.quantity}</span>
-                                  </div>
-                                  <div className="flex justify-between">
-                                    <span className="text-gray-500">Offer Total:</span>
-                                    <span className="font-bold text-blue-600">${(offer.offerPrice * offer.quantity).toFixed(2)}</span>
-                                  </div>
-                                  {offer.counterPrice && (
-                                    <>
-                                      <hr className="my-2" />
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-500">Counter Price:</span>
-                                        <span className="font-medium text-orange-600">${offer.counterPrice.toFixed(2)} × {offer.quantity}</span>
+                          <td colSpan="10" className="px-4 py-4 bg-gray-50">
+                            <div className="space-y-4">
+                              {/* Messages Section */}
+                              {(offer.message || offer.counterMessage || offer.rejectionReason) && (
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                  {offer.message && (
+                                    <div className="bg-blue-50 rounded-xl p-4 border border-blue-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MessageSquare className="w-4 h-4 text-blue-500" />
+                                        <h4 className="text-sm font-semibold text-blue-700">Your Message</h4>
                                       </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-500">Counter Total:</span>
-                                        <span className="font-bold text-orange-600">${(offer.counterPrice * offer.quantity).toFixed(2)}</span>
+                                      <p className="text-sm text-blue-800">{offer.message}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {offer.counterMessage && (
+                                    <div className="bg-orange-50 rounded-xl p-4 border border-orange-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <MessageSquare className="w-4 h-4 text-orange-500" />
+                                        <h4 className="text-sm font-semibold text-orange-700">Seller's Response</h4>
                                       </div>
-                                    </>
+                                      <p className="text-sm text-orange-800">{offer.counterMessage}</p>
+                                    </div>
+                                  )}
+                                  
+                                  {offer.rejectionReason && (
+                                    <div className="bg-red-50 rounded-xl p-4 border border-red-100">
+                                      <div className="flex items-center gap-2 mb-2">
+                                        <AlertTriangle className="w-4 h-4 text-red-500" />
+                                        <h4 className="text-sm font-semibold text-red-700">Rejection Reason</h4>
+                                      </div>
+                                      <p className="text-sm text-red-800">{offer.rejectionReason}</p>
+                                    </div>
                                   )}
                                 </div>
+                              )}
+
+                              {/* Product Details Grid */}
+                              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                                <DetailCard
+                                  icon={<Hash className="w-4 h-4 text-teal-500" />}
+                                  label="NDC Number"
+                                  value={offer.ndcNumber}
+                                />
+                                <DetailCard
+                                  icon={<Building2 className="w-4 h-4 text-purple-500" />}
+                                  label="Manufacturer"
+                                  value={offer.productSnapshot?.manufacturer || offer.manufacturer}
+                                />
+                                <DetailCard
+                                  icon={<FlaskConical className="w-4 h-4 text-indigo-500" />}
+                                  label="Strength"
+                                  value={offer.productSnapshot?.strength}
+                                />
+                                <DetailCard
+                                  icon={<Pill className="w-4 h-4 text-pink-500" />}
+                                  label="Dosage Form"
+                                  value={offer.productSnapshot?.dosageForm}
+                                />
+                                <DetailCard
+                                  icon={<Calendar className="w-4 h-4 text-orange-500" />}
+                                  label="Expiration"
+                                  value={offer.productSnapshot?.expirationDate ? formatDate(offer.productSnapshot.expirationDate) : 'N/A'}
+                                />
+                                <DetailCard
+                                  icon={<BoxSelect className="w-4 h-4 text-emerald-500" />}
+                                  label="Pack Condition"
+                                  value={offer.productSnapshot?.packSize}
+                                />
+                                <DetailCard
+                                  icon={<Layers className="w-4 h-4 text-cyan-500" />}
+                                  label="Pack Size"
+                                  value={offer.productSnapshot?.packSize}
+                                />
+                                <DetailCard
+                                  icon={<Package className="w-4 h-4 text-amber-500" />}
+                                  label="Lot Number"
+                                  value={offer.productSnapshot?.lotNumber}
+                                />
+                                <DetailCard
+                                  icon={<Thermometer className="w-4 h-4 text-blue-500" />}
+                                  label="Fridge"
+                                  value={offer.productSnapshot?.isFridgeProduct === 'Yes' ? 'Yes' : 'No'}
+                                />
                               </div>
 
-                              <div className="bg-white rounded-xl p-4 border">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Messages</h4>
-                                {offer.message ? (
-                                  <div className="bg-blue-50 rounded-lg p-2 mb-2">
-                                    <p className="text-xs font-medium text-blue-700 mb-0.5">Your message:</p>
-                                    <p className="text-sm text-blue-800">{offer.message}</p>
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-gray-400 mb-2">No message sent</p>
-                                )}
-                                {offer.counterMessage && (
-                                  <div className="bg-orange-50 rounded-lg p-2 mb-2">
-                                    <p className="text-xs font-medium text-orange-700 mb-0.5">Seller's response:</p>
-                                    <p className="text-sm text-orange-800">{offer.counterMessage}</p>
-                                  </div>
-                                )}
-                                {offer.rejectionReason && (
-                                  <div className="bg-red-50 rounded-lg p-2">
-                                    <p className="text-xs font-medium text-red-700 mb-0.5">Rejection reason:</p>
-                                    <p className="text-sm text-red-800">{offer.rejectionReason}</p>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div className="bg-white rounded-xl p-4 border">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Timeline</h4>
-                                <div className="space-y-2 text-xs">
-                                  <div className="flex items-center gap-2">
+                              {/* Timeline */}
+                              <div className="bg-white rounded-xl p-4 border border-gray-100">
+                                <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                                  <Clock className="w-4 h-4 text-gray-500" />
+                                  Timeline
+                                </h4>
+                                <div className="space-y-2 text-sm">
+                                  <div className="flex items-center gap-3">
                                     <div className="w-2 h-2 bg-blue-500 rounded-full" />
-                                    <span className="text-gray-600">Submitted: {formatDate(offer.createdAt)}</span>
+                                    <span className="text-gray-600">Created: {formatDate(offer.createdAt)}</span>
                                   </div>
                                   {offer.counteredAt && (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                       <div className="w-2 h-2 bg-orange-500 rounded-full" />
                                       <span className="text-gray-600">Countered: {formatDate(offer.counteredAt)}</span>
                                     </div>
                                   )}
                                   {offer.acceptedAt && (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                       <div className="w-2 h-2 bg-green-500 rounded-full" />
                                       <span className="text-gray-600">Accepted: {formatDate(offer.acceptedAt)}</span>
                                     </div>
                                   )}
                                   {offer.rejectedAt && (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-3">
                                       <div className="w-2 h-2 bg-red-500 rounded-full" />
                                       <span className="text-gray-600">Rejected: {formatDate(offer.rejectedAt)}</span>
                                     </div>
                                   )}
-                                  <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-3">
                                     <div className="w-2 h-2 bg-gray-400 rounded-full" />
                                     <span className="text-gray-500">Expires: {formatDate(offer.expiresAt)}</span>
                                   </div>
                                 </div>
-                                {offer.convertedOrder && (
-                                  <div className="mt-3 bg-green-50 rounded-lg p-2">
-                                    <p className="text-xs text-green-700 flex items-center gap-1">
-                                      <ShoppingBag className="w-3 h-3" />
-                                      Order created successfully
-                                    </p>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           </td>

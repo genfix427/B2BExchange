@@ -47,7 +47,7 @@ import {
   setFilters,
   clearFilters
 } from '../../store/slices/storeSlice';
-import { createOffer, fetchOfferCounts } from '../../store/slices/offerSlice';
+import { createOffer, fetchOfferStats } from '../../store/slices/offerSlice';
 
 // ─── Toast Helpers ───────────────────────────────────────────────
 const showSuccessToast = (message) => {
@@ -508,7 +508,7 @@ const StorePage = () => {
       );
       setShowOfferModal(false);
       setSelectedProduct(null);
-      dispatch(fetchOfferCounts());
+      dispatch(fetchOfferStats());
     } catch (error) {
       showErrorToast(error || 'Failed to submit offer');
     }

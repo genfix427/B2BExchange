@@ -1,37 +1,37 @@
-// routes/vendor/offer.routes.js
 import express from 'express';
 import {
   createOffer,
+  acceptOffer,
+  counterOffer,
+  rejectOffer,
   getReceivedOffers,
   getSentOffers,
   getOfferDetails,
-  acceptOffer,
-  rejectOffer,
-  counterOffer,
-  acceptCounterOffer,
-  rejectCounterOffer,
-  cancelOffer,
-  getOfferCounts
+  getOfferStats
 } from '../../controllers/vendor/offer.controller.js';
 import { vendorProtect } from '../../middleware/auth.middleware.js';
 
 const router = express.Router();
 
+// All routes require vendor authentication
 router.use(vendorProtect);
 
-// Offer CRUD
-router.post('/', createOffer);
+// Stats (put before /:offerId to avoid route conflicts)
+router.get('/stats', getOfferStats);
+
+// List offers
 router.get('/received', getReceivedOffers);
 router.get('/sent', getSentOffers);
-router.get('/counts', getOfferCounts);
-router.get('/:id', getOfferDetails);
+
+// Create offer
+router.post('/', createOffer);
+
+// Single offer details
+router.get('/:offerId', getOfferDetails);
 
 // Offer actions
-router.put('/:id/accept', acceptOffer);
-router.put('/:id/reject', rejectOffer);
-router.put('/:id/counter', counterOffer);
-router.put('/:id/accept-counter', acceptCounterOffer);
-router.put('/:id/reject-counter', rejectCounterOffer);
-router.put('/:id/cancel', cancelOffer);
+router.put('/:offerId/accept', acceptOffer);
+router.put('/:offerId/counter', counterOffer);
+router.put('/:offerId/reject', rejectOffer);
 
 export default router;
